@@ -1,4 +1,4 @@
-import axios from 'axios'
+import api from '../api/client'
 import { Link } from 'react-router-dom'
 
 export interface TokenRow {
@@ -37,10 +37,9 @@ function formatValue(value: number | null, prefix = '') {
 function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
   const handleWishlistClick = async (stockId: number) => {
     try {
-      await axios.post(
-        '/api/token/wishlist/toggle/',
-        { stock_id: stockId },
-        { withCredentials: true }
+      await api.post(
+        '/token/wishlist/toggle/',
+        { stock_id: stockId }
       )
     } catch (error) {
       console.error('Failed to toggle wishlist', error)
