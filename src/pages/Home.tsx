@@ -63,15 +63,7 @@ function Home() {
 
   return (
     <div className="container-fluid py-4 px-3 px-md-4">
-      <div
-        className="mb-4"
-        style={{
-          display: 'flex',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+      <div className="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
         <h1 className="display-6 fw-bold mb-0">TradingViewer</h1>
         <div className="fw-semibold text-muted">
           Time Before Refresh: {secondsUntilRefresh} seconds
