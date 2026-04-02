@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import axios from 'axios'
+import api, { getApiErrorMessage } from '../api/client'
 
 import TokenHistoryTable, { type TokenHistoryRow } from '../components/TokenHistoryTable'
 import TradingViewWidget from '../components/TradingViewWidget'
@@ -27,7 +27,7 @@ function TokenPage() {
         setLoading(true)
         setError('')
 
-        const { data } = await axios.get<StockDetailApiResponse>(`/api/token/${ticker}/`)
+        const { data } = await api.get<StockDetailApiResponse>(`/token/${ticker}/`)
 
         if (!data.response.status) {
           throw new Error(data.response.message || 'Failed to fetch stock detail')
@@ -35,17 +35,7 @@ function TokenPage() {
 
         setRows(data.response.data.stock_data ?? [])
       } catch (err: unknown) {
-        if (axios.isAxiosError(err)) {
-          setError(
-            err.response?.data?.response?.message ||
-              err.message ||
-              'Failed to fetch stock detail'
-          )
-        } else if (err instanceof Error) {
-          setError(err.message)
-        } else {
-          setError('Something went wrong')
-        }
+        setError(getApiErrorMessage(err, 'Failed to fetch stock detail'))
       } finally {
         setLoading(false)
       }

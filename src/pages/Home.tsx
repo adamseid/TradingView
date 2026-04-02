@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import axios from 'axios'
+import api, { getApiErrorMessage } from '../api/client'
 import TokenTable, { type TokenRow } from '../components/TokenTable'
 
 interface HomeApiResponse {
@@ -24,9 +24,7 @@ function Home() {
     try {
       setError('')
 
-      const { data } = await axios.get<HomeApiResponse>('/api/', {
-        withCredentials: true,
-      })
+      const { data } = await api.get<HomeApiResponse>('/')
 
       if (!data.response.status) {
         throw new Error(data.response.message || 'Failed to fetch homepage data')
@@ -36,14 +34,7 @@ function Home() {
       setCryptoList(data.response.data.crypto_list ?? [])
       setWishlist(data.response.data.wishlist ?? [])
     } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.response?.message || err.message || 'Failed to fetch homepage data')
-      } else if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Something went wrong')
-      }
-    } finally {
+      setError(getApiErrorMessage(err, 'Failed to fetch homepage data'))
     }
   }, [])
 
@@ -61,33 +52,30 @@ function Home() {
     <div className="container-fluid py-4 px-3 px-md-4">
       <h1 className="display-6 fw-bold mb-4">TradingViewer</h1>
 
-      {/* {loading && <div className="alert alert-secondary">Loading dashboard...</div>} */}
       {error && <div className="alert alert-danger">{error}</div>}
 
-      {/* {!loading && !error && ( */}
-        <div className="d-flex flex-column gap-4">
-          <div className="card shadow-sm border-0">
-            <div className="card-header bg-danger text-white">Wishlist</div>
-            <div className="card-body p-0">
-              <TokenTable tokens={wishlist} fetchHomePageData={fetchHomePageData} />
-            </div>
-          </div>
-
-          <div className="card shadow-sm border-0">
-            <div className="card-header bg-dark text-white">Stocks</div>
-            <div className="card-body p-0">
-              <TokenTable tokens={stockList} fetchHomePageData={fetchHomePageData} />
-            </div>
-          </div>
-
-          <div className="card shadow-sm border-0">
-            <div className="card-header bg-primary text-white">Crypto</div>
-            <div className="card-body p-0">
-              <TokenTable tokens={cryptoList} fetchHomePageData={fetchHomePageData} />
-            </div>
+      <div className="d-flex flex-column gap-4">
+        <div className="card shadow-sm border-0">
+          <div className="card-header bg-danger text-white">Wishlist</div>
+          <div className="card-body p-0">
+            <TokenTable tokens={wishlist} fetchHomePageData={fetchHomePageData} />
           </div>
         </div>
-      {/* )} */}
+
+        <div className="card shadow-sm border-0">
+          <div className="card-header bg-dark text-white">Stocks</div>
+          <div className="card-body p-0">
+            <TokenTable tokens={stockList} fetchHomePageData={fetchHomePageData} />
+          </div>
+        </div>
+
+        <div className="card shadow-sm border-0">
+          <div className="card-header bg-primary text-white">Crypto</div>
+          <div className="card-body p-0">
+            <TokenTable tokens={cryptoList} fetchHomePageData={fetchHomePageData} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

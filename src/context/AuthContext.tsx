@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import axios from 'axios'
+import api from '../api/client'
 
 interface User {
   id: number
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = async () => {
     try {
-      const { data } = await axios.get('/api/auth/me/', { withCredentials: true })
+      const { data } = await api.get('/auth/me/')
       const payload = data.response.data
       setUser(payload.authenticated ? payload.user : null)
     } finally {
@@ -39,11 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const loginUser = async (email: string, password: string) => {
-    const { data } = await axios.post(
-      '/api/auth/login/',
-      { email, password },
-      { withCredentials: true }
-    )
+    const { data } = await api.post('/auth/login/', { email, password })
     setUser(data.response.data.user)
   }
 
@@ -53,14 +49,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string
     password: string
   }) => {
-    const { data } = await axios.post('/api/auth/register/', payload, {
-      withCredentials: true,
-    })
+    const { data } = await api.post('/auth/register/', payload)
     setUser(data.response.data.user)
   }
 
   const logoutUser = async () => {
-    await axios.post('/api/auth/logout/', {}, { withCredentials: true })
+    await api.post('/auth/logout/', {})
     setUser(null)
   }
 
