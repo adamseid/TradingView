@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import api from '../api/client'
 import { Link } from 'react-router-dom'
 
@@ -35,17 +36,30 @@ function formatValue(value: number | null, prefix = '') {
 }
 
 function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
+  const touchedRef = useRef(false)
+
   const handleWishlistClick = async (stockId: number) => {
     try {
-      await api.post(
-        '/token/wishlist/toggle/',
-        { stock_id: stockId }
-      )
+      await api.post('/token/wishlist/toggle/', { stock_id: stockId })
     } catch (error) {
       console.error('Failed to toggle wishlist', error)
     } finally {
       await fetchHomePageData()
     }
+  }
+
+  const handleWishlistTouchStart = async (stockId: number) => {
+    touchedRef.current = true
+    await handleWishlistClick(stockId)
+
+    window.setTimeout(() => {
+      touchedRef.current = false
+    }, 500)
+  }
+
+  const handleWishlistButtonClick = async (stockId: number) => {
+    if (touchedRef.current) return
+    await handleWishlistClick(stockId)
   }
 
   return (
@@ -90,7 +104,8 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
                     <button
                       type="button"
                       className="btn btn-link text-danger text-decoration-none w-100 h-100 py-2 px-0 rounded-0"
-                      onClick={() => handleWishlistClick(token.stock_id)}
+                      onClick={() => handleWishlistButtonClick(token.stock_id)}
+                      onTouchStart={() => handleWishlistTouchStart(token.stock_id)}
                       aria-label={
                         token.wishlist
                           ? `Remove ${token.ticker} from wishlist`
