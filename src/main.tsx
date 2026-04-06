@@ -6,7 +6,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { initCsrf } from './api/client'
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from '@vercel/analytics/react'
 
 async function bootstrap() {
   try {
@@ -20,7 +20,6 @@ async function bootstrap() {
       <BrowserRouter>
         <AuthProvider>
           <App />
-
           <Analytics />
         </AuthProvider>
       </BrowserRouter>
