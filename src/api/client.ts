@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-
+// Client-side API utility for making requests to the backend server, handling CSRF tokens, and error management.
 type ApiErrorResponse = {
   response?: {
     status?: boolean;
