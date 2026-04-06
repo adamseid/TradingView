@@ -10,8 +10,12 @@ type ApiErrorResponse = {
 
 let csrfToken: string | null = null;
 
+const baseURL = import.meta.env.DEV
+  ? import.meta.env.VITE_API_URL || "/api"
+  : "/api";
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL,
   withCredentials: true,
 });
 
