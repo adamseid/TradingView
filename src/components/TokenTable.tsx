@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useState, useRef } from 'react'
 import api from '../api/client'
 import { Link } from 'react-router-dom'
 
@@ -37,24 +37,37 @@ function formatValue(value: number | null, prefix = '') {
 
 function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
   const isSubmittingRef = useRef(false)
+  const [error, setError] = useState('')
 
   const handleWishlistClick = async (stockId: number) => {
     if (isSubmittingRef.current) return
 
     isSubmittingRef.current = true
+    setError('')
 
     try {
       await api.post('/token/wishlist/toggle/', { stock_id: stockId })
     } catch (error) {
       console.error('Failed to toggle wishlist', error)
+      setError('Failed to update wishlist. Please try again.')
     } finally {
       await fetchHomePageData()
       isSubmittingRef.current = false
     }
   }
 
+  const triggerWishlist = (
+    event: React.MouseEvent<HTMLButtonElement> | React.PointerEvent<HTMLButtonElement>,
+    stockId: number,
+  ) => {
+    event.preventDefault()
+    event.stopPropagation()
+    void handleWishlistClick(stockId)
+  }
+
   return (
     <div className="container-fluid px-0">
+      {error && <div className="alert alert-danger m-2 mb-0">{error}</div>}
       <div className="table-responsive" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
         <table className="table table-hover table-bordered align-middle w-100 mb-0">
           <thead className="table-light sticky-top">
@@ -95,8 +108,13 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
                     <button
                       type="button"
                       className="btn btn-link text-danger text-decoration-none w-100 h-100 py-2 px-0 rounded-0"
-                      onClick={() => void handleWishlistClick(token.stock_id)}
-                      style={{ touchAction: 'manipulation' }}
+                      onClick={(event) => triggerWishlist(event, token.stock_id)}
+                      onPointerUp={(event) => {
+                        if (event.pointerType !== 'mouse') {
+                          triggerWishlist(event, token.stock_id)
+                        }
+                      }}
+                      style={{ touchAction: 'manipulation', minHeight: '44px', minWidth: '44px' }}
                       aria-label={
                         token.wishlist
                           ? `Remove ${token.ticker} from wishlist`
