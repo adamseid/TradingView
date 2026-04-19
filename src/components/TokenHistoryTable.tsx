@@ -38,9 +38,9 @@ function formatDate(value: string) {
 
 function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
   return (
-    <div className="table-responsive">
+    <div className="table-responsive" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
       <table className="table table-hover table-bordered align-middle w-100 mb-0">
-        <thead className="table-light">
+        <thead className="table-light sticky-top">
           <tr>
             <th scope="col" className="text-nowrap"></th>
             <th scope="col" className="text-nowrap">Date</th>
