@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
 import TokenPage from './pages/TokenPage'
+import AddStockPage from './pages/AddStockPage'
+import EditStockPage from './pages/EditStockPage'
 import AuthPage from './pages/AuthPage'
 import RequireAuth from './components/RequireAuth'
 import RedirectIfAuth from './components/RedirectIfAuth'
@@ -31,6 +33,24 @@ function App() {
         element={
           <RequireAuth>
             <TokenPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/stocks/new"
+        element={
+          <RequireAuth>
+            <AddStockPage />
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/stocks/edit"
+        element={
+          <RequireAuth>
+            <EditStockPage />
           </RequireAuth>
         }
       />

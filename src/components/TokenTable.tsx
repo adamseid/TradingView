@@ -30,14 +30,72 @@ interface TokenTableProps {
   fetchHomePageData: () => Promise<void>
 }
 
+type SortableColumn =
+  | 'ticker'
+  | 'total_score'
+  | 'current_price'
+  | 'daily_profit'
+  | 'daily_return'
+  | 'support_resistance_score'
+  | 'kinematics_score'
+  | 'five_day_velocity_score'
+  | 'five_day_acceleration_score'
+  | 'daily_macd_score'
+  | 'daily_macd_velocity'
+  | 'weekly_macd_score'
+  | 'weekly_macd_velocity'
+  | 'ma_score'
+  | 'ma_50d_score'
+  | 'ma_100d_score'
+  | 'ma_200d_score'
+
+type SortDirection = 'asc' | 'desc'
+
+const sortableColumns: Array<{ key: SortableColumn; label: string }> = [
+  { key: 'ticker', label: 'Ticker' },
+  { key: 'total_score', label: 'Total Score' },
+  { key: 'current_price', label: 'Current Price' },
+  { key: 'daily_profit', label: 'Daily Profit' },
+  { key: 'daily_return', label: 'Daily Return' },
+  { key: 'support_resistance_score', label: 'S/R Score' },
+  { key: 'kinematics_score', label: 'Kinematics' },
+  { key: 'five_day_velocity_score', label: '5D Velocity' },
+  { key: 'five_day_acceleration_score', label: '5D Acceleration' },
+  { key: 'daily_macd_score', label: 'Daily MACD Score' },
+  { key: 'daily_macd_velocity', label: 'Daily MACD Velocity' },
+  { key: 'weekly_macd_score', label: 'Weekly MACD Score' },
+  { key: 'weekly_macd_velocity', label: 'Weekly MACD Velocity' },
+  { key: 'ma_score', label: 'MA Score' },
+  { key: 'ma_50d_score', label: 'MA 50D' },
+  { key: 'ma_100d_score', label: 'MA 100D' },
+  { key: 'ma_200d_score', label: 'MA 200D' },
+]
+
 function formatValue(value: number | null, prefix = '') {
   if (value === null || value === undefined) return '-'
   return `${prefix}${value}`
 }
 
+function compareNullableValues(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
+) {
+  if (a == null && b == null) return 0
+  if (a == null) return 1
+  if (b == null) return -1
+
+  if (typeof a === 'string' && typeof b === 'string') {
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+  }
+
+  return Number(a) - Number(b)
+}
+
 function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
   const isSubmittingRef = useRef(false)
   const [error, setError] = useState('')
+  const [sortKey, setSortKey] = useState<SortableColumn>('ticker')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const handleWishlistClick = async (stockId: number) => {
     if (isSubmittingRef.current) return
@@ -65,6 +123,42 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
     void handleWishlistClick(stockId)
   }
 
+  const handleSort = (column: SortableColumn) => {
+    if (sortKey === column) {
+      setSortDirection((currentDirection) =>
+        currentDirection === 'asc' ? 'desc' : 'asc',
+      )
+      return
+    }
+
+    setSortKey(column)
+    setSortDirection('asc')
+  }
+
+  const renderSortableHeader = (key: SortableColumn, label: string) => {
+    const isActive = sortKey === key
+    const iconClass =
+      isActive && sortDirection === 'asc'
+        ? 'bi-sort-alpha-down'
+        : 'bi-sort-alpha-up'
+
+    return (
+      <button
+        type="button"
+        className="btn btn-link p-0 text-decoration-none text-dark fw-semibold d-inline-flex align-items-center gap-2 w-100 text-start"
+        onClick={() => handleSort(key)}
+      >
+        <i className={`bi ${iconClass} ${isActive ? '' : 'opacity-50'}`}></i>
+        <span>{label}</span>
+      </button>
+    )
+  }
+
+  const sortedTokens = [...tokens].sort((left, right) => {
+    const result = compareNullableValues(left[sortKey], right[sortKey])
+    return sortDirection === 'asc' ? result : result * -1
+  })
+
   return (
     <div className="container-fluid px-0">
       {error && <div className="alert alert-danger m-2 mb-0">{error}</div>}
@@ -74,35 +168,23 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
             <tr>
               <th scope="col" className="text-nowrap px-2"></th>
               <th scope="col" className="text-nowrap px-2"></th>
-              <th scope="col" className="text-nowrap px-2">Ticker</th>
-              <th scope="col" className="text-nowrap px-2">Total Score</th>
-              <th scope="col" className="text-nowrap px-2">Current Price</th>
-              <th scope="col" className="text-nowrap px-2">Daily Profit</th>
-              <th scope="col" className="text-nowrap px-2">Daily Return</th>
-              <th scope="col" className="text-nowrap px-2">S/R Score</th>
-              <th scope="col" className="text-nowrap px-2">Kinematics</th>
-              <th scope="col" className="text-nowrap px-2">5D Velocity</th>
-              <th scope="col" className="text-nowrap px-2">5D Acceleration</th>
-              <th scope="col" className="text-nowrap px-2">Daily MACD Score</th>
-              <th scope="col" className="text-nowrap px-2">Daily MACD Velocity</th>
-              <th scope="col" className="text-nowrap px-2">Weekly MACD Score</th>
-              <th scope="col" className="text-nowrap px-2">Weekly MACD Velocity</th>
-              <th scope="col" className="text-nowrap px-2">MA Score</th>
-              <th scope="col" className="text-nowrap px-2">MA 50D</th>
-              <th scope="col" className="text-nowrap px-2">MA 100D</th>
-              <th scope="col" className="text-nowrap px-2">MA 200D</th>
+              {sortableColumns.map((column) => (
+                <th key={column.key} scope="col" className="text-nowrap px-2">
+                  {renderSortableHeader(column.key, column.label)}
+                </th>
+              ))}
             </tr>
           </thead>
 
           <tbody>
-            {tokens.length === 0 ? (
+            {sortedTokens.length === 0 ? (
               <tr>
                 <td colSpan={19} className="text-center py-4 text-muted px-2">
                   No tokens available.
                 </td>
               </tr>
             ) : (
-              tokens.map((token) => (
+              sortedTokens.map((token) => (
                 <tr key={token.stock_id}>
                   <td className="text-center px-2 py-0" style={{ width: '48px' }}>
                     <button
