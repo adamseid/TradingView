@@ -109,43 +109,45 @@ function AppNavbar() {
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary-subtle">
-      <div className="container-fluid px-3 px-md-4 flex-wrap align-items-start">
-        <div className="d-flex align-items-center gap-3 flex-grow-1 flex-lg-grow-0">
-          <div
-            className="d-flex align-items-center gap-2 w-100 w-lg-auto justify-content-between justify-content-lg-start"
+      <div className="container-fluid px-3 px-md-4 d-flex flex-wrap align-items-start align-items-lg-center gap-3">
+        <div className="d-flex d-lg-none align-items-center justify-content-between w-100">
+          <Link className="navbar-brand fw-semibold mb-0" to="/">
+            TradingViewer
+          </Link>
+
+          <button
+            type="button"
+            className="navbar-toggler"
+            aria-label="Toggle navigation"
+            aria-controls="mobile-navbar-links"
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((current) => !current)}
           >
-            <Link className="navbar-brand fw-semibold mb-0" to="/">
-              TradingViewer
-            </Link>
+            <span className="navbar-toggler-icon"></span>
+          </button>
+        </div>
 
-            <button
-              type="button"
-              className="navbar-toggler d-lg-none"
-              aria-label="Toggle navigation"
-              aria-controls="mobile-navbar-links"
-              aria-expanded={mobileMenuOpen}
-              onClick={() => setMobileMenuOpen((current) => !current)}
-            >
-              <span className="navbar-toggler-icon"></span>
-            </button>
-          </div>
+        <div className="d-none d-lg-flex align-items-center gap-4 flex-grow-1">
+          <Link className="navbar-brand fw-semibold mb-0 me-2" to="/">
+            TradingViewer
+          </Link>
 
-          <div className="navbar-nav flex-row gap-2 d-none d-lg-flex">
+          <div className="navbar-nav flex-row flex-nowrap align-items-center gap-4">
             <Link
               to="/"
-              className={`nav-link px-2 ${location.pathname === '/' ? 'active' : ''}`}
+              className={`nav-link px-0 text-nowrap ${location.pathname === '/' ? 'active' : ''}`}
             >
               Home
             </Link>
             <Link
               to="/stocks/new"
-              className={`nav-link px-2 ${location.pathname === '/stocks/new' ? 'active' : ''}`}
+              className={`nav-link px-0 text-nowrap ${location.pathname === '/stocks/new' ? 'active' : ''}`}
             >
               Add New Stock
             </Link>
             <Link
               to="/stocks/edit"
-              className={`nav-link px-2 ${location.pathname === '/stocks/edit' ? 'active' : ''}`}
+              className={`nav-link px-0 text-nowrap ${location.pathname === '/stocks/edit' ? 'active' : ''}`}
             >
               Edit Stock
             </Link>
@@ -153,9 +155,9 @@ function AppNavbar() {
         </div>
 
         <form
-          className="d-flex flex-column align-items-stretch mt-3 mt-lg-0 ms-lg-auto"
+          className="d-flex flex-column align-items-stretch w-100 mt-0 ms-lg-auto"
           onSubmit={submitSearch}
-          style={{ minWidth: '320px', maxWidth: '100%' }}
+          style={{ width: '100%', maxWidth: '440px' }}
         >
           <div className="position-relative">
             <div className="input-group">
