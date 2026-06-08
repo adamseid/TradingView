@@ -112,8 +112,7 @@ function AppNavbar() {
       <div className="container-fluid px-3 px-md-4 flex-wrap align-items-start">
         <div className="d-flex align-items-center gap-3 flex-grow-1">
           <div
-            className="d-flex align-items-center gap-2"
-            style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between' }}
+            className="d-flex align-items-center gap-2 w-100 w-lg-auto justify-content-between justify-content-lg-start"
           >
             <Link className="navbar-brand fw-semibold mb-0" to="/">
               TradingViewer
