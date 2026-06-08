@@ -17,6 +17,7 @@ function AppNavbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const hideSuggestionsTimeoutRef = useRef<number | null>(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [searchError, setSearchError] = useState('')
@@ -55,6 +56,10 @@ function AppNavbar() {
 
     return () => window.clearTimeout(timeoutId)
   }, [query])
+
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [location.pathname])
 
   useEffect(() => {
     return () => {
@@ -104,13 +109,29 @@ function AppNavbar() {
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary-subtle">
-      <div className="container-fluid px-3 px-md-4">
-        <div className="d-flex align-items-center gap-3">
-          <Link className="navbar-brand fw-semibold" to="/">
-            TradingViewer
-          </Link>
+      <div className="container-fluid px-3 px-md-4 flex-wrap align-items-start">
+        <div className="d-flex align-items-center gap-3 flex-grow-1">
+          <div
+            className="d-flex align-items-center gap-2"
+            style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between' }}
+          >
+            <Link className="navbar-brand fw-semibold mb-0" to="/">
+              TradingViewer
+            </Link>
 
-          <div className="navbar-nav flex-row gap-2">
+            <button
+              type="button"
+              className="navbar-toggler d-lg-none"
+              aria-label="Toggle navigation"
+              aria-controls="mobile-navbar-links"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((current) => !current)}
+            >
+              <span className="navbar-toggler-icon"></span>
+            </button>
+          </div>
+
+          <div className="navbar-nav flex-row gap-2 d-none d-lg-flex">
             <Link
               to="/"
               className={`nav-link px-2 ${location.pathname === '/' ? 'active' : ''}`}
@@ -179,6 +200,32 @@ function AppNavbar() {
             <small className="text-danger mt-1">{searchError}</small>
           )}
         </form>
+
+        {mobileMenuOpen && (
+          <div
+            id="mobile-navbar-links"
+            className="navbar-nav d-lg-none w-100 mt-3 pt-2 border-top border-secondary-subtle"
+          >
+            <Link
+              to="/"
+              className={`nav-link px-0 ${location.pathname === '/' ? 'active' : ''}`}
+            >
+              Home
+            </Link>
+            <Link
+              to="/stocks/new"
+              className={`nav-link px-0 ${location.pathname === '/stocks/new' ? 'active' : ''}`}
+            >
+              Add New Stock
+            </Link>
+            <Link
+              to="/stocks/edit"
+              className={`nav-link px-0 ${location.pathname === '/stocks/edit' ? 'active' : ''}`}
+            >
+              Edit Stock
+            </Link>
+          </div>
+        )}
       </div>
     </nav>
   )
