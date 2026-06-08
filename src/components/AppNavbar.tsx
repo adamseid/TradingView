@@ -110,7 +110,7 @@ function AppNavbar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-secondary-subtle">
       <div className="container-fluid px-3 px-md-4 flex-wrap align-items-start">
-        <div className="d-flex align-items-center gap-3 flex-grow-1">
+        <div className="d-flex align-items-center gap-3 flex-grow-1 flex-lg-grow-0">
           <div
             className="d-flex align-items-center gap-2 w-100 w-lg-auto justify-content-between justify-content-lg-start"
           >
@@ -153,7 +153,7 @@ function AppNavbar() {
         </div>
 
         <form
-          className="d-flex flex-column align-items-stretch mt-3 mt-lg-0"
+          className="d-flex flex-column align-items-stretch mt-3 mt-lg-0 ms-lg-auto"
           onSubmit={submitSearch}
           style={{ minWidth: '320px', maxWidth: '100%' }}
         >
