@@ -282,48 +282,57 @@ function TokenPage() {
 
             {!loading && !error && (
               <div className="d-flex flex-column gap-4">
-                <div className="card shadow-sm border-0 w-100">
+                <div
+                  className="card shadow-sm border-0 w-100"
+                  style={{ maxHeight: '100vh' }}
+                >
                   <div className="card-header bg-light fw-semibold">
                     Daily Graphs
                   </div>
-                  <div className="card-body">
-                    <div className="text-muted small mb-4">
-                      {isCrypto
-                        ? 'Crypto uses all intraday rows and keeps calendar-day data.'
-                        : 'Stocks only use rows captured between 7am and 1pm Eastern on weekdays.'}
-                    </div>
-
-                    <div className="d-flex flex-column gap-4">
-                      <div>
-                        <h2 className="h5 mb-3">Median Daily Price</h2>
-                        <TokenLineChart
-                          data={priceSeries}
-                          color="#0d6efd"
-                          emptyMessage="No price chart data available."
-                          valueFormatter={formatPriceValue}
-                        />
+                  <div className="card-body overflow-auto">
+                    <div className="row g-4 align-items-stretch">
+                      <div className="col-12 col-xl-4 d-flex">
+                        <div className="w-100 h-100">
+                          <TokenLineChart
+                            data={priceSeries}
+                            color="#0d6efd"
+                            emptyMessage="No price chart data available."
+                            title="Median Daily Price"
+                            datasetLabel="Price"
+                            height={320}
+                            valueFormatter={formatPriceValue}
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <h2 className="h5 mb-3">3-Day Average Daily MACD Histogram</h2>
-                        <TokenLineChart
-                          data={dailyMacdSeries}
-                          color="#198754"
-                          emptyMessage="Need at least 3 daily MACD points to draw this chart."
-                          valueFormatter={formatMacdValue}
-                          showZeroLine
-                        />
+                      <div className="col-12 col-xl-4 d-flex">
+                        <div className="w-100 h-100">
+                          <TokenLineChart
+                            data={dailyMacdSeries}
+                            color="#198754"
+                            emptyMessage="Need at least 3 daily MACD points to draw this chart."
+                            title="3-Day Average Daily MACD Histogram"
+                            datasetLabel="Daily MACD"
+                            height={320}
+                            valueFormatter={formatMacdValue}
+                            showZeroLine
+                          />
+                        </div>
                       </div>
 
-                      <div>
-                        <h2 className="h5 mb-3">3-Day Average Weekly MACD Histogram</h2>
-                        <TokenLineChart
-                          data={weeklyMacdSeries}
-                          color="#dc3545"
-                          emptyMessage="Need at least 3 weekly MACD points to draw this chart."
-                          valueFormatter={formatMacdValue}
-                          showZeroLine
-                        />
+                      <div className="col-12 col-xl-4 d-flex">
+                        <div className="w-100 h-100">
+                          <TokenLineChart
+                            data={weeklyMacdSeries}
+                            color="#dc3545"
+                            emptyMessage="Need at least 3 weekly MACD points to draw this chart."
+                            title="3-Day Average Weekly MACD Histogram"
+                            datasetLabel="Weekly MACD"
+                            height={320}
+                            valueFormatter={formatMacdValue}
+                            showZeroLine
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
