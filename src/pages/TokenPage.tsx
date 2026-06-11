@@ -311,7 +311,7 @@ function TokenPage() {
                             data={dailyMacdSeries}
                             color="#198754"
                             emptyMessage="Need at least 3 daily MACD points to draw this chart."
-                            title="3-Day Average Daily MACD Histogram"
+                            title="3-Day Average Daily MACD"
                             datasetLabel="Daily MACD"
                             height={320}
                             valueFormatter={formatMacdValue}
@@ -326,7 +326,7 @@ function TokenPage() {
                             data={weeklyMacdSeries}
                             color="#dc3545"
                             emptyMessage="Need at least 3 weekly MACD points to draw this chart."
-                            title="3-Day Average Weekly MACD Histogram"
+                            title="3-Day Average Weekly MACD"
                             datasetLabel="Weekly MACD"
                             height={320}
                             valueFormatter={formatMacdValue}
