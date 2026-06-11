@@ -85,6 +85,19 @@ function getEasternDateParts(value: string) {
   }
 }
 
+function toNumericValue(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function prepareRows(rows: TokenHistoryRow[], isCrypto: boolean) {
   return rows
     .map((row) => {
@@ -134,19 +147,19 @@ function getDailyMedianPoints(rows: TokenHistoryRow[], isCrypto: boolean) {
       return {
         dayKey,
         dayLabel: medianRow.dayLabel,
-        price: medianRow.row.current_price,
-        dailyMacd: medianRow.row.daily_macd_histogram,
-        weeklyMacd: medianRow.row.weekly_macd_histogram,
+        price: toNumericValue(medianRow.row.current_price),
+        dailyMacd: toNumericValue(medianRow.row.daily_macd_histogram),
+        weeklyMacd: toNumericValue(medianRow.row.weekly_macd_histogram),
       }
     })
 }
 
 function buildPriceSeries(points: DailyMedianPoint[]) {
   return points
-    .filter((point) => point.price !== null)
+    .filter((point): point is DailyMedianPoint & { price: number } => point.price !== null)
     .map((point) => ({
       label: point.dayLabel,
-      value: point.price as number,
+      value: point.price,
     }))
 }
 
