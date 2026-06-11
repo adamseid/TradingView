@@ -19,6 +19,7 @@ export interface TokenHistoryRow {
   total_score: number | null
   direction: number | null
   exchange?: string
+  screener?: string
 }
 
 interface TokenHistoryTableProps {

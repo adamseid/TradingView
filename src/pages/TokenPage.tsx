@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import api, { getApiErrorMessage } from '../api/client'
 
 import AppNavbar from '../components/AppNavbar'
+import TokenLineChart from '../components/TokenLineChart'
 import TokenHistoryTable, { type TokenHistoryRow } from '../components/TokenHistoryTable'
 import TradingViewWidget from '../components/TradingViewWidget'
 
@@ -14,6 +15,179 @@ interface StockDetailApiResponse {
       stock_data: TokenHistoryRow[]
     }
   }
+}
+
+interface ChartPoint {
+  label: string
+  value: number
+}
+
+interface PreparedRow {
+  row: TokenHistoryRow
+  timestamp: number
+  dayKey: string
+  dayLabel: string
+  weekday: string
+  hour: number
+}
+
+interface DailyMedianPoint {
+  dayKey: string
+  dayLabel: string
+  price: number | null
+  dailyMacd: number | null
+  weeklyMacd: number | null
+}
+
+const EASTERN_TIME_ZONE = 'America/New_York'
+const EASTERN_PARTS_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: EASTERN_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+const EASTERN_DAY_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: EASTERN_TIME_ZONE,
+  month: 'short',
+  day: 'numeric',
+})
+
+function getEasternDateParts(value: string) {
+  const date = new Date(value)
+  const timestamp = date.getTime()
+
+  if (Number.isNaN(timestamp)) {
+    return null
+  }
+
+  const parts = EASTERN_PARTS_FORMATTER.formatToParts(date)
+  const lookup = new Map(parts.map((part) => [part.type, part.value]))
+  const year = lookup.get('year')
+  const month = lookup.get('month')
+  const day = lookup.get('day')
+  const weekday = lookup.get('weekday')
+  const hour = lookup.get('hour')
+
+  if (!year || !month || !day || !weekday || !hour) {
+    return null
+  }
+
+  return {
+    timestamp,
+    dayKey: `${year}-${month}-${day}`,
+    dayLabel: EASTERN_DAY_LABEL_FORMATTER.format(date),
+    weekday,
+    hour: Number(hour),
+  }
+}
+
+function prepareRows(rows: TokenHistoryRow[], isCrypto: boolean) {
+  return rows
+    .map((row) => {
+      const dateParts = getEasternDateParts(row.date)
+
+      if (!dateParts) {
+        return null
+      }
+
+      if (!isCrypto) {
+        const isWeekend = dateParts.weekday === 'Sat' || dateParts.weekday === 'Sun'
+        const isAllowedHour = dateParts.hour >= 7 && dateParts.hour < 14
+
+        if (isWeekend || !isAllowedHour) {
+          return null
+        }
+      }
+
+      return {
+        row,
+        timestamp: dateParts.timestamp,
+        dayKey: dateParts.dayKey,
+        dayLabel: dateParts.dayLabel,
+        weekday: dateParts.weekday,
+        hour: dateParts.hour,
+      }
+    })
+    .filter((entry): entry is PreparedRow => entry !== null)
+}
+
+function getDailyMedianPoints(rows: TokenHistoryRow[], isCrypto: boolean) {
+  const preparedRows = prepareRows(rows, isCrypto)
+  const rowsByDay = new Map<string, PreparedRow[]>()
+
+  preparedRows.forEach((entry) => {
+    const dayRows = rowsByDay.get(entry.dayKey) ?? []
+    dayRows.push(entry)
+    rowsByDay.set(entry.dayKey, dayRows)
+  })
+
+  return [...rowsByDay.entries()]
+    .sort(([leftDay], [rightDay]) => leftDay.localeCompare(rightDay))
+    .map(([dayKey, dayRows]) => {
+      const sortedRows = [...dayRows].sort((left, right) => left.timestamp - right.timestamp)
+      const medianRow = sortedRows[Math.floor(sortedRows.length / 2)]
+
+      return {
+        dayKey,
+        dayLabel: medianRow.dayLabel,
+        price: medianRow.row.current_price,
+        dailyMacd: medianRow.row.daily_macd_histogram,
+        weeklyMacd: medianRow.row.weekly_macd_histogram,
+      }
+    })
+}
+
+function buildPriceSeries(points: DailyMedianPoint[]) {
+  return points
+    .filter((point) => point.price !== null)
+    .map((point) => ({
+      label: point.dayLabel,
+      value: point.price as number,
+    }))
+}
+
+function buildThreeDayAverageSeries(
+  points: DailyMedianPoint[],
+  macdKey: 'dailyMacd' | 'weeklyMacd',
+) {
+  const chartPoints: ChartPoint[] = []
+
+  for (let index = 2; index < points.length; index += 1) {
+    const window = points.slice(index - 2, index + 1)
+    const macdValues = window.map((point) => point[macdKey])
+
+    if (macdValues.some((value) => value === null)) {
+      continue
+    }
+
+    const numericMacdValues = macdValues.filter(
+      (value): value is number => value !== null,
+    )
+    const total = numericMacdValues.reduce((sum, value) => sum + value, 0)
+
+    chartPoints.push({
+      label: points[index].dayLabel,
+      value: total / numericMacdValues.length,
+    })
+  }
+
+  return chartPoints
+}
+
+function formatPriceValue(value: number) {
+  if (Math.abs(value) >= 100) {
+    return `$${value.toFixed(2)}`
+  }
+
+  return `$${value.toFixed(4)}`
+}
+
+function formatMacdValue(value: number) {
+  return value.toFixed(4)
 }
 
 function TokenPage() {
@@ -48,7 +222,12 @@ function TokenPage() {
   }, [ticker])
 
   const exchange = rows[0]?.exchange ?? ''
+  const isCrypto = rows[0]?.screener?.toLowerCase() === 'crypto'
   const pageTitle = ticker?.toUpperCase() ?? 'Stock'
+  const dailyMedianPoints = getDailyMedianPoints(rows, isCrypto)
+  const priceSeries = buildPriceSeries(dailyMedianPoints)
+  const dailyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'dailyMacd')
+  const weeklyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'weeklyMacd')
 
   return (
     <>
@@ -90,6 +269,53 @@ function TokenPage() {
 
             {!loading && !error && (
               <div className="d-flex flex-column gap-4">
+                <div className="card shadow-sm border-0 w-100">
+                  <div className="card-header bg-light fw-semibold">
+                    Daily Graphs
+                  </div>
+                  <div className="card-body">
+                    <div className="text-muted small mb-4">
+                      {isCrypto
+                        ? 'Crypto uses all intraday rows and keeps calendar-day data.'
+                        : 'Stocks only use rows captured between 7am and 1pm Eastern on weekdays.'}
+                    </div>
+
+                    <div className="d-flex flex-column gap-4">
+                      <div>
+                        <h2 className="h5 mb-3">Median Daily Price</h2>
+                        <TokenLineChart
+                          data={priceSeries}
+                          color="#0d6efd"
+                          emptyMessage="No price chart data available."
+                          valueFormatter={formatPriceValue}
+                        />
+                      </div>
+
+                      <div>
+                        <h2 className="h5 mb-3">3-Day Average Daily MACD Histogram</h2>
+                        <TokenLineChart
+                          data={dailyMacdSeries}
+                          color="#198754"
+                          emptyMessage="Need at least 3 daily MACD points to draw this chart."
+                          valueFormatter={formatMacdValue}
+                          showZeroLine
+                        />
+                      </div>
+
+                      <div>
+                        <h2 className="h5 mb-3">3-Day Average Weekly MACD Histogram</h2>
+                        <TokenLineChart
+                          data={weeklyMacdSeries}
+                          color="#dc3545"
+                          emptyMessage="Need at least 3 weekly MACD points to draw this chart."
+                          valueFormatter={formatMacdValue}
+                          showZeroLine
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="card shadow-sm border-0 w-100">
                   <div className="card-header bg-light fw-semibold">
                     History
