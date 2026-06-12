@@ -37,6 +37,7 @@ interface DailyMedianPoint {
   price: number | null
   dailyMacd: number | null
   weeklyMacd: number | null
+  totalScore: number | null
 }
 
 const EASTERN_TIME_ZONE = 'America/New_York'
@@ -150,6 +151,7 @@ function getDailyMedianPoints(rows: TokenHistoryRow[], isCrypto: boolean) {
         price: toNumericValue(medianRow.row.current_price),
         dailyMacd: toNumericValue(medianRow.row.daily_macd_histogram),
         weeklyMacd: toNumericValue(medianRow.row.weekly_macd_histogram),
+        totalScore: toNumericValue(medianRow.row.total_score),
       }
     })
 }
@@ -191,6 +193,18 @@ function buildThreeDayAverageSeries(
   return chartPoints
 }
 
+function buildScoreSeries(points: DailyMedianPoint[]) {
+  return points
+    .filter(
+      (point): point is DailyMedianPoint & { totalScore: number } =>
+        point.totalScore !== null,
+    )
+    .map((point) => ({
+      label: point.dayLabel,
+      value: point.totalScore,
+    }))
+}
+
 function formatPriceValue(value: number) {
   if (Math.abs(value) >= 100) {
     return `$${value.toFixed(2)}`
@@ -201,6 +215,10 @@ function formatPriceValue(value: number) {
 
 function formatMacdValue(value: number) {
   return value.toFixed(4)
+}
+
+function formatScoreValue(value: number) {
+  return value.toFixed(2)
 }
 
 function TokenPage() {
@@ -241,6 +259,7 @@ function TokenPage() {
   const priceSeries = buildPriceSeries(dailyMedianPoints)
   const dailyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'dailyMacd')
   const weeklyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'weeklyMacd')
+  const totalScoreSeries = buildScoreSeries(dailyMedianPoints)
 
   return (
     <>
@@ -290,50 +309,49 @@ function TokenPage() {
                     Daily Graphs
                   </div>
                   <div className="card-body overflow-auto">
-                    <div className="row g-4 align-items-stretch">
-                      <div className="col-12 col-xl-4 d-flex">
-                        <div className="w-100 h-100">
-                          <TokenLineChart
-                            data={priceSeries}
-                            color="#0d6efd"
-                            emptyMessage="No price chart data available."
-                            title="Median Daily Price"
-                            datasetLabel="Price"
-                            height={320}
-                            valueFormatter={formatPriceValue}
-                          />
-                        </div>
-                      </div>
+                    <div className="d-flex flex-column gap-4">
+                      <TokenLineChart
+                        data={priceSeries}
+                        color="#0d6efd"
+                        emptyMessage="No price chart data available."
+                        title="Median Daily Price"
+                        datasetLabel="Price"
+                        height={320}
+                        valueFormatter={formatPriceValue}
+                      />
 
-                      <div className="col-12 col-xl-4 d-flex">
-                        <div className="w-100 h-100">
-                          <TokenLineChart
-                            data={dailyMacdSeries}
-                            color="#198754"
-                            emptyMessage="Need at least 3 daily MACD points to draw this chart."
-                            title="3-Day Average Daily MACD"
-                            datasetLabel="Daily MACD"
-                            height={320}
-                            valueFormatter={formatMacdValue}
-                            showZeroLine
-                          />
-                        </div>
-                      </div>
+                      <TokenLineChart
+                        data={dailyMacdSeries}
+                        color="#198754"
+                        emptyMessage="Need at least 3 daily MACD points to draw this chart."
+                        title="3-Day Average Daily MACD"
+                        datasetLabel="Daily MACD"
+                        height={320}
+                        valueFormatter={formatMacdValue}
+                        showZeroLine
+                      />
 
-                      <div className="col-12 col-xl-4 d-flex">
-                        <div className="w-100 h-100">
-                          <TokenLineChart
-                            data={weeklyMacdSeries}
-                            color="#dc3545"
-                            emptyMessage="Need at least 3 weekly MACD points to draw this chart."
-                            title="3-Day Average Weekly MACD"
-                            datasetLabel="Weekly MACD"
-                            height={320}
-                            valueFormatter={formatMacdValue}
-                            showZeroLine
-                          />
-                        </div>
-                      </div>
+                      <TokenLineChart
+                        data={weeklyMacdSeries}
+                        color="#dc3545"
+                        emptyMessage="Need at least 3 weekly MACD points to draw this chart."
+                        title="3-Day Average Weekly MACD"
+                        datasetLabel="Weekly MACD"
+                        height={320}
+                        valueFormatter={formatMacdValue}
+                        showZeroLine
+                      />
+
+                      <TokenLineChart
+                        data={totalScoreSeries}
+                        color="#6f42c1"
+                        emptyMessage="No total score chart data available."
+                        title="Median Daily Total Score"
+                        datasetLabel="Total Score"
+                        height={320}
+                        valueFormatter={formatScoreValue}
+                        showZeroLine
+                      />
                     </div>
                   </div>
                 </div>
