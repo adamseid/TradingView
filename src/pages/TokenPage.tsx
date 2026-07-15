@@ -37,7 +37,8 @@ interface DailyMedianPoint {
   price: number | null
   dailyMacd: number | null
   weeklyMacd: number | null
-  totalScore: number | null
+  strategyOneScore: number | null
+   strategyTwoScore: number | null
 }
 
 const EASTERN_TIME_ZONE = 'America/New_York'
@@ -151,7 +152,8 @@ function getDailyMedianPoints(rows: TokenHistoryRow[], isCrypto: boolean) {
         price: toNumericValue(medianRow.row.current_price),
         dailyMacd: toNumericValue(medianRow.row.daily_macd_histogram),
         weeklyMacd: toNumericValue(medianRow.row.weekly_macd_histogram),
-        totalScore: toNumericValue(medianRow.row.total_score),
+        strategyOneScore: toNumericValue(medianRow.row.strategy_one_score),
+        strategyTwoScore: toNumericValue(medianRow.row.strategy_two_score),
       }
     })
 }
@@ -196,12 +198,24 @@ function buildThreeDayAverageSeries(
 function buildScoreSeries(points: DailyMedianPoint[]) {
   return points
     .filter(
-      (point): point is DailyMedianPoint & { totalScore: number } =>
-        point.totalScore !== null,
+      (point): point is DailyMedianPoint & { strategyOneScore: number } =>
+        point.strategyOneScore !== null,
     )
     .map((point) => ({
       label: point.dayLabel,
-      value: point.totalScore,
+      value: point.strategyOneScore,
+    }))
+}
+
+function buildStrategyTwoScoreSeries(points: DailyMedianPoint[]) {
+  return points
+    .filter(
+      (point): point is DailyMedianPoint & { strategyTwoScore: number } =>
+        point.strategyTwoScore !== null,
+    )
+    .map((point) => ({
+      label: point.dayLabel,
+      value: point.strategyTwoScore,
     }))
 }
 
@@ -259,7 +273,8 @@ function TokenPage() {
   const priceSeries = buildPriceSeries(dailyMedianPoints)
   const dailyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'dailyMacd')
   const weeklyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'weeklyMacd')
-  const totalScoreSeries = buildScoreSeries(dailyMedianPoints)
+  const strategyOneScoreSeries = buildScoreSeries(dailyMedianPoints)
+  const strategyTwoScoreSeries = buildStrategyTwoScoreSeries(dailyMedianPoints)
 
   return (
     <>
@@ -270,7 +285,20 @@ function TokenPage() {
           <div className="col-12">
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
               <div>
-                <h1 className="display-6 fw-bold mb-1">{pageTitle}</h1>
+                <div className="d-flex align-items-center gap-2">
+                  <h1 className="display-6 fw-bold mb-1">{pageTitle}</h1>
+                  {ticker && exchange && (
+                    <a
+                      href={`https://www.tradingview.com/chart/Uy07wzBL/?symbol=${exchange}%3A${ticker.toUpperCase()}`}
+                      className="text-danger text-decoration-none fs-5"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${ticker.toUpperCase()} on TradingView`}
+                    >
+                      <i className="bi bi-box-arrow-up-right"></i>
+                    </a>
+                  )}
+                </div>
               </div>
 
               <div className="d-flex gap-2 align-items-center">
@@ -343,11 +371,22 @@ function TokenPage() {
                       />
 
                       <TokenLineChart
-                        data={totalScoreSeries}
+                        data={strategyOneScoreSeries}
                         color="#6f42c1"
-                        emptyMessage="No total score chart data available."
-                        title="Median Daily Total Score"
-                        datasetLabel="Total Score"
+                        emptyMessage="No score 1 chart data available."
+                        title="Median Daily Score 1"
+                        datasetLabel="Score 1"
+                        height={320}
+                        valueFormatter={formatScoreValue}
+                        showZeroLine
+                      />
+
+                      <TokenLineChart
+                        data={strategyTwoScoreSeries}
+                        color="#fd7e14"
+                        emptyMessage="No score 2 chart data available."
+                        title="Median Daily Score 2"
+                        datasetLabel="Score 2"
                         height={320}
                         valueFormatter={formatScoreValue}
                         showZeroLine

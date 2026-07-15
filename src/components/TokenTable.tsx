@@ -7,7 +7,8 @@ export interface TokenRow {
   wishlist: number
   ticker: string
   exchange: string
-  total_score: number | null
+  strategy_one_score: number | null
+  strategy_two_score: number | null
   current_price: number | null
   daily_profit: number | null
   daily_return: number | null
@@ -32,7 +33,8 @@ interface TokenTableProps {
 
 type SortableColumn =
   | 'ticker'
-  | 'total_score'
+  | 'strategy_one_score'
+  | 'strategy_two_score'
   | 'current_price'
   | 'daily_profit'
   | 'daily_return'
@@ -53,7 +55,8 @@ type SortDirection = 'asc' | 'desc'
 
 const sortableColumns: Array<{ key: SortableColumn; label: string }> = [
   { key: 'ticker', label: 'Ticker' },
-  { key: 'total_score', label: 'Total Score' },
+  { key: 'strategy_one_score', label: 'Score 1' },
+  { key: 'strategy_two_score', label: 'Score 2' },
   { key: 'current_price', label: 'Current Price' },
   { key: 'daily_profit', label: 'Daily Profit' },
   { key: 'daily_return', label: 'Daily Return' },
@@ -179,7 +182,7 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
           <tbody>
             {sortedTokens.length === 0 ? (
               <tr>
-                <td colSpan={19} className="text-center py-4 text-muted px-2">
+                <td colSpan={20} className="text-center py-4 text-muted px-2">
                   No tokens available.
                 </td>
               </tr>
@@ -223,7 +226,8 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
                       {token.ticker}
                     </Link>
                   </td>
-                  <td className="text-nowrap px-2">{formatValue(token.total_score)}</td>
+                  <td className="text-nowrap px-2">{formatValue(token.strategy_one_score)}</td>
+                  <td className="text-nowrap px-2">{formatValue(token.strategy_two_score)}</td>
                   <td className="text-nowrap px-2">{formatValue(token.current_price, '$')}</td>
                   <td className="text-nowrap px-2">{formatValue(token.daily_profit, '$')}</td>
                   <td className="text-nowrap px-2">{formatValue(token.daily_return, '$')}</td>

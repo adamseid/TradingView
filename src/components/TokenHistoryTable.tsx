@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom"
-
 export interface TokenHistoryRow {
   id: number
   ticker: string
@@ -16,8 +14,10 @@ export interface TokenHistoryRow {
   weekly_macd_histogram: number | null
   weekly_macd_velocity: number | null
   weekly_macd_score: number | null
-  total_score: number | null
-  direction: number | null
+  strategy_one_score: number | null
+  strategy_two_score: number | null
+  strategy_one_direction?: number | null
+  strategy_two_direction?: number | null
   exchange?: string
   screener?: string
 }
@@ -43,7 +43,6 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
       <table className="table table-hover table-bordered align-middle w-100 mb-0">
         <thead className="table-light sticky-top">
           <tr>
-            <th scope="col" className="text-nowrap"></th>
             <th scope="col" className="text-nowrap">Date</th>
             <th scope="col" className="text-nowrap">Price</th>
             <th scope="col" className="text-nowrap">Support/Resistance Score</th>
@@ -55,29 +54,21 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
             <th scope="col" className="text-nowrap">MACD 1W</th>
             <th scope="col" className="text-nowrap">MACD 1W Velocity</th>
             <th scope="col" className="text-nowrap">MACD 1W Score</th>
-            <th scope="col" className="text-nowrap">Total Score</th>
-            <th scope="col" className="text-nowrap">Direction</th>
+            <th scope="col" className="text-nowrap">Score 1</th>
+            <th scope="col" className="text-nowrap">Score 2</th>
           </tr>
         </thead>
 
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={15} className="text-center py-4 text-muted">
+              <td colSpan={13} className="text-center py-4 text-muted">
                 No stock history found.
               </td>
             </tr>
           ) : (
             rows.map((row) => (
               <tr key={row.id}>
-                <td className="text-nowrap">
-                    <Link
-                        to={`https://www.tradingview.com/chart/Uy07wzBL/?symbol=${row.exchange}%3A${row.ticker}`}
-                        className="text-danger text-decoration-none"
-                    >
-                        <i className="bi bi-box-arrow-up-right"></i>
-                    </Link>
-                </td>
                 <td className="text-nowrap">{formatDate(row.date)}</td>
                 <td className="text-nowrap">{formatValue(row.current_price, '$')}</td>
                 <td className="text-nowrap">{formatValue(row.support_resistance_score)}</td>
@@ -89,8 +80,8 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
                 <td className="text-nowrap">{formatValue(row.weekly_macd_histogram)}</td>
                 <td className="text-nowrap">{formatValue(row.weekly_macd_velocity)}</td>
                 <td className="text-nowrap">{formatValue(row.weekly_macd_score)}</td>
-                <td className="text-nowrap fw-semibold">{formatValue(row.total_score)}</td>
-                <td className="text-nowrap">{formatValue(row.direction)}</td>
+                <td className="text-nowrap fw-semibold">{formatValue(row.strategy_one_score)}</td>
+                <td className="text-nowrap fw-semibold">{formatValue(row.strategy_two_score)}</td>
               </tr>
             ))
           )}

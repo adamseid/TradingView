@@ -23,6 +23,8 @@ function Home() {
   const [wishlist, setWishlist] = useState<TokenRow[]>([])
   const [error, setError] = useState('')
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState(REFRESH_INTERVAL_SECONDS)
+  const [selectedScore, setSelectedScore] = useState<'score1' | 'score2'>('score1')
+  const [isRecalculating, setIsRecalculating] = useState(false)
 
   const fetchHomePageData = useCallback(async () => {
     try {
@@ -43,6 +45,30 @@ function Home() {
   }, [])
 
   const stockCategoryEntries = Object.entries(stockList)
+
+  const handleRecalculate = async () => {
+    if (isRecalculating) return
+
+    try {
+      setIsRecalculating(true)
+      setError('')
+
+      const { data } = await api.post('/token/recalculate-scores/', {
+        score: selectedScore,
+      })
+
+      if (!data.response?.status) {
+        throw new Error(data.response?.message || 'Failed to recalculate scores')
+      }
+
+      await fetchHomePageData()
+      setSecondsUntilRefresh(REFRESH_INTERVAL_SECONDS)
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Failed to recalculate scores'))
+    } finally {
+      setIsRecalculating(false)
+    }
+  }
 
   useEffect(() => {
     let secondsLeft = REFRESH_INTERVAL_SECONDS
@@ -72,6 +98,30 @@ function Home() {
         <div className="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
           <div className="fw-semibold text-muted">
             Time Before Refresh: {secondsUntilRefresh} seconds
+          </div>
+
+          <div className="d-flex align-items-center gap-2 mt-3 mt-md-0">
+            <select
+              className="form-select"
+              value={selectedScore}
+              onChange={(event) =>
+                setSelectedScore(event.target.value as 'score1' | 'score2')
+              }
+              style={{ minWidth: '160px' }}
+              disabled={isRecalculating}
+            >
+              <option value="score1">Strategy One</option>
+              <option value="score2">Strategy Two</option>
+            </select>
+
+            <button
+              type="button"
+              className="btn btn-outline-primary"
+              onClick={() => void handleRecalculate()}
+              disabled={isRecalculating}
+            >
+              {isRecalculating ? 'Recalculating...' : 'Recalculate'}
+            </button>
           </div>
         </div>
 
