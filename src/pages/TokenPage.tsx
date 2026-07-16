@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import api, { getApiErrorMessage } from '../api/client'
 
 import AppNavbar from '../components/AppNavbar'
+import PerformanceCalculator from '../components/PerformanceCalculator'
 import TokenLineChart from '../components/TokenLineChart'
 import TokenMultiLineChart from '../components/TokenMultiLineChart'
 import TokenHistoryTable, { type TokenHistoryRow } from '../components/TokenHistoryTable'
@@ -65,6 +66,7 @@ interface DayMetricBuckets {
 }
 
 interface ChartSeriesCollection {
+  dailyMedianPoints: DailyMedianPoint[]
   medianPriceSeries: ChartPoint[]
   medianDailyMacdSeries: ChartPoint[]
   medianWeeklyMacdSeries: ChartPoint[]
@@ -292,6 +294,7 @@ function buildChartSeries(rows: TokenHistoryRow[], isCrypto: boolean): ChartSeri
   }
 
   return {
+    dailyMedianPoints,
     medianPriceSeries: buildMedianSeries((point) => point.price),
     medianDailyMacdSeries: buildMedianSeries((point) => point.dailyMacd),
     medianWeeklyMacdSeries: buildMedianSeries((point) => point.weeklyMacd),
@@ -423,6 +426,7 @@ function TokenPage() {
   const isCrypto = rows[0]?.screener?.toLowerCase() === 'crypto'
   const pageTitle = ticker?.toUpperCase() ?? 'Stock'
   const {
+    dailyMedianPoints,
     medianPriceSeries,
     medianDailyMacdSeries,
     medianWeeklyMacdSeries,
@@ -487,7 +491,9 @@ function TokenPage() {
               <Accordion alwaysOpen className="d-flex flex-column gap-3">
                 <Accordion.Item eventKey="performance" className="shadow-sm border-0">
                   <Accordion.Header>Performance calculator</Accordion.Header>
-                  <Accordion.Body />
+                  <Accordion.Body>
+                    <PerformanceCalculator dailyPoints={dailyMedianPoints} />
+                  </Accordion.Body>
                 </Accordion.Item>
 
                 <Accordion.Item eventKey="strategy-1" className="shadow-sm border-0">
