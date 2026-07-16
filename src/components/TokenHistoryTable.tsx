@@ -1,3 +1,5 @@
+import { formatCurrency, formatNumber } from '../utils/formatters'
+
 export interface TokenHistoryRow {
   id: number
   ticker: string
@@ -26,11 +28,6 @@ interface TokenHistoryTableProps {
   rows: TokenHistoryRow[]
 }
 
-function formatValue(value: number | string | null | undefined, prefix = '') {
-  if (value === null || value === undefined || value === '') return '-'
-  return `${prefix}${value}`
-}
-
 function formatDate(value: string) {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return value
@@ -44,6 +41,8 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
         <thead className="table-light sticky-top">
           <tr>
             <th scope="col" className="text-nowrap">Date</th>
+            <th scope="col" className="text-nowrap">Score 1</th>
+            <th scope="col" className="text-nowrap">Score 2</th>
             <th scope="col" className="text-nowrap">Price</th>
             <th scope="col" className="text-nowrap">Support/Resistance Score</th>
             <th scope="col" className="text-nowrap">MA</th>
@@ -54,8 +53,6 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
             <th scope="col" className="text-nowrap">MACD 1W</th>
             <th scope="col" className="text-nowrap">MACD 1W Velocity</th>
             <th scope="col" className="text-nowrap">MACD 1W Score</th>
-            <th scope="col" className="text-nowrap">Score 1</th>
-            <th scope="col" className="text-nowrap">Score 2</th>
           </tr>
         </thead>
 
@@ -70,18 +67,18 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
             rows.map((row) => (
               <tr key={row.id}>
                 <td className="text-nowrap">{formatDate(row.date)}</td>
-                <td className="text-nowrap">{formatValue(row.current_price, '$')}</td>
-                <td className="text-nowrap">{formatValue(row.support_resistance_score)}</td>
-                <td className="text-nowrap">{formatValue(row.sma_200)}</td>
-                <td className="text-nowrap">{formatValue(row.ma_score)}</td>
-                <td className="text-nowrap">{formatValue(row.daily_macd_histogram)}</td>
-                <td className="text-nowrap">{formatValue(row.daily_macd_velocity)}</td>
-                <td className="text-nowrap">{formatValue(row.daily_macd_score)}</td>
-                <td className="text-nowrap">{formatValue(row.weekly_macd_histogram)}</td>
-                <td className="text-nowrap">{formatValue(row.weekly_macd_velocity)}</td>
-                <td className="text-nowrap">{formatValue(row.weekly_macd_score)}</td>
-                <td className="text-nowrap fw-semibold">{formatValue(row.strategy_one_score)}</td>
-                <td className="text-nowrap fw-semibold">{formatValue(row.strategy_two_score)}</td>
+                <td className="text-nowrap fw-semibold">{formatNumber(row.strategy_one_score, 0, 3)}</td>
+                <td className="text-nowrap fw-semibold">{formatNumber(row.strategy_two_score, 0, 3)}</td>
+                <td className="text-nowrap">{formatCurrency(row.current_price)}</td>
+                <td className="text-nowrap">{formatNumber(row.support_resistance_score, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.sma_200, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.ma_score, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.daily_macd_histogram, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.daily_macd_velocity, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.daily_macd_score, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.weekly_macd_histogram, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.weekly_macd_velocity, 0, 3)}</td>
+                <td className="text-nowrap">{formatNumber(row.weekly_macd_score, 0, 3)}</td>
               </tr>
             ))
           )}

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import api from '../api/client'
 import { Link } from 'react-router-dom'
+import { formatCurrency, formatNumber, formatPercent } from '../utils/formatters'
 
 export interface TokenRow {
   stock_id: number
@@ -10,8 +11,7 @@ export interface TokenRow {
   strategy_one_score: number | null
   strategy_two_score: number | null
   current_price: number | null
-  daily_profit: number | null
-  daily_return: number | null
+  price_change: number | null
   support_resistance_score: number | null
   kinematics_score: number | null
   five_day_velocity_score: number | null
@@ -52,6 +52,10 @@ type SortableColumn =
   | 'ma_200d_score'
 
 type SortDirection = 'asc' | 'desc'
+type DerivedTokenRow = TokenRow & {
+  daily_profit: number | null
+  daily_return: number | null
+}
 
 const sortableColumns: Array<{ key: SortableColumn; label: string }> = [
   { key: 'ticker', label: 'Ticker' },
@@ -74,11 +78,6 @@ const sortableColumns: Array<{ key: SortableColumn; label: string }> = [
   { key: 'ma_200d_score', label: 'MA 200D' },
 ]
 
-function formatValue(value: number | null, prefix = '') {
-  if (value === null || value === undefined) return '-'
-  return `${prefix}${value}`
-}
-
 function compareNullableValues(
   a: string | number | null | undefined,
   b: string | number | null | undefined,
@@ -92,6 +91,26 @@ function compareNullableValues(
   }
 
   return Number(a) - Number(b)
+}
+
+function getDerivedTokenValues(token: TokenRow) {
+  let daily_profit: number | null = null
+  let daily_return: number | null = null
+
+  if (token.current_price !== null && token.price_change !== null) {
+    daily_profit = token.current_price * (token.price_change / 100)
+
+    const denominator = daily_profit + token.current_price
+    if (denominator !== 0) {
+      daily_return = daily_profit / denominator
+    }
+  }
+
+  return {
+    ...token,
+    daily_profit,
+    daily_return,
+  }
 }
 
 function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
@@ -157,7 +176,9 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
     )
   }
 
-  const sortedTokens = [...tokens].sort((left, right) => {
+  const sortedTokens: DerivedTokenRow[] = tokens
+    .map(getDerivedTokenValues)
+    .sort((left, right) => {
     const result = compareNullableValues(left[sortKey], right[sortKey])
     return sortDirection === 'asc' ? result : result * -1
   })
@@ -226,23 +247,23 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
                       {token.ticker}
                     </Link>
                   </td>
-                  <td className="text-nowrap px-2">{formatValue(token.strategy_one_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.strategy_two_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.current_price, '$')}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.daily_profit, '$')}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.daily_return, '$')}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.support_resistance_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.kinematics_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.five_day_velocity_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.five_day_acceleration_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.daily_macd_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.daily_macd_velocity)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.weekly_macd_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.weekly_macd_velocity)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.ma_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.ma_50d_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.ma_100d_score)}</td>
-                  <td className="text-nowrap px-2">{formatValue(token.ma_200d_score)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.strategy_one_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.strategy_two_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatCurrency(token.current_price)}</td>
+                  <td className="text-nowrap px-2">{formatCurrency(token.daily_profit)}</td>
+                  <td className="text-nowrap px-2">{formatPercent(token.daily_return)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.support_resistance_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.kinematics_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.five_day_velocity_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.five_day_acceleration_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.daily_macd_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.daily_macd_velocity, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.weekly_macd_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.weekly_macd_velocity, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.ma_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.ma_50d_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.ma_100d_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.ma_200d_score, 0, 3)}</td>
                 </tr>
               ))
             )}
