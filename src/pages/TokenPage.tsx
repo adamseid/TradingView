@@ -6,6 +6,7 @@ import AppNavbar from '../components/AppNavbar'
 import TokenLineChart from '../components/TokenLineChart'
 import TokenHistoryTable, { type TokenHistoryRow } from '../components/TokenHistoryTable'
 import TradingViewWidget from '../components/TradingViewWidget'
+import { formatCurrency, formatNumber } from '../utils/formatters'
 
 interface StockDetailApiResponse {
   response: {
@@ -246,19 +247,19 @@ function buildStrategyTwoScoreSeries(points: DailyMedianPoint[]) {
 }
 
 function formatPriceValue(value: number) {
-  if (Math.abs(value) >= 100) {
-    return `$${value.toFixed(2)}`
-  }
-
-  return `$${value.toFixed(4)}`
+  return formatCurrency(
+    value,
+    Math.abs(value) >= 100 ? 2 : 4,
+    Math.abs(value) >= 100 ? 2 : 4,
+  )
 }
 
 function formatMacdValue(value: number) {
-  return value.toFixed(4)
+  return formatNumber(value, 4, 4)
 }
 
 function formatScoreValue(value: number) {
-  return value.toFixed(2)
+  return formatNumber(value, 2, 2)
 }
 
 function TokenPage() {
