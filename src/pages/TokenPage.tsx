@@ -38,7 +38,7 @@ interface DailyMedianPoint {
   dailyMacd: number | null
   weeklyMacd: number | null
   strategyOneScore: number | null
-   strategyTwoScore: number | null
+  strategyTwoScore: number | null
 }
 
 const EASTERN_TIME_ZONE = 'America/New_York'
@@ -130,11 +130,10 @@ function prepareRows(rows: TokenHistoryRow[], isCrypto: boolean) {
     .filter((entry): entry is PreparedRow => entry !== null)
 }
 
-function getDailyMedianPoints(rows: TokenHistoryRow[], isCrypto: boolean) {
-  const preparedRows = prepareRows(rows, isCrypto)
+function groupRowsByDay(rows: PreparedRow[]) {
   const rowsByDay = new Map<string, PreparedRow[]>()
 
-  preparedRows.forEach((entry) => {
+  rows.forEach((entry) => {
     const dayRows = rowsByDay.get(entry.dayKey) ?? []
     dayRows.push(entry)
     rowsByDay.set(entry.dayKey, dayRows)
@@ -142,20 +141,75 @@ function getDailyMedianPoints(rows: TokenHistoryRow[], isCrypto: boolean) {
 
   return [...rowsByDay.entries()]
     .sort(([leftDay], [rightDay]) => leftDay.localeCompare(rightDay))
-    .map(([dayKey, dayRows]) => {
-      const sortedRows = [...dayRows].sort((left, right) => left.timestamp - right.timestamp)
-      const medianRow = sortedRows[Math.floor(sortedRows.length / 2)]
+    .map(([dayKey, dayRows]) => ({
+      dayKey,
+      dayLabel: dayRows[0]?.dayLabel ?? dayKey,
+      rows: dayRows,
+    }))
+}
 
-      return {
-        dayKey,
-        dayLabel: medianRow.dayLabel,
-        price: toNumericValue(medianRow.row.current_price),
-        dailyMacd: toNumericValue(medianRow.row.daily_macd_histogram),
-        weeklyMacd: toNumericValue(medianRow.row.weekly_macd_histogram),
-        strategyOneScore: toNumericValue(medianRow.row.strategy_one_score),
-        strategyTwoScore: toNumericValue(medianRow.row.strategy_two_score),
-      }
+function getMedianValue(values: Array<number | null>) {
+  const numericValues = values
+    .filter((value): value is number => value !== null)
+    .sort((left, right) => left - right)
+
+  if (numericValues.length === 0) {
+    return null
+  }
+
+  const middleIndex = Math.floor(numericValues.length / 2)
+
+  if (numericValues.length % 2 === 1) {
+    return numericValues[middleIndex]
+  }
+
+  return (numericValues[middleIndex - 1] + numericValues[middleIndex]) / 2
+}
+
+function getDailyMedianPoints(rows: TokenHistoryRow[], isCrypto: boolean) {
+  const preparedRows = prepareRows(rows, isCrypto)
+  return groupRowsByDay(preparedRows).map(({ dayKey, dayLabel, rows: dayRows }) => {
+    return {
+      dayKey,
+      dayLabel,
+      price: getMedianValue(dayRows.map((entry) => toNumericValue(entry.row.current_price))),
+      dailyMacd: getMedianValue(dayRows.map((entry) => toNumericValue(entry.row.daily_macd_histogram))),
+      weeklyMacd: getMedianValue(dayRows.map((entry) => toNumericValue(entry.row.weekly_macd_histogram))),
+      strategyOneScore: getMedianValue(dayRows.map((entry) => toNumericValue(entry.row.strategy_one_score))),
+      strategyTwoScore: getMedianValue(dayRows.map((entry) => toNumericValue(entry.row.strategy_two_score))),
+    }
+  })
+}
+
+function buildThreeDayAverageSeries(
+  rows: TokenHistoryRow[],
+  isCrypto: boolean,
+  macdKey: 'daily_macd_histogram' | 'weekly_macd_histogram',
+) {
+  const groupedDays = groupRowsByDay(prepareRows(rows, isCrypto))
+  const chartPoints: ChartPoint[] = []
+
+  for (let index = 2; index < groupedDays.length; index += 1) {
+    const window = groupedDays.slice(index - 2, index + 1)
+    const allValues = window.flatMap((group) =>
+      group.rows
+        .map((entry) => toNumericValue(entry.row[macdKey]))
+        .filter((value): value is number => value !== null),
+    )
+
+    if (allValues.length === 0) {
+      continue
+    }
+
+    const total = allValues.reduce((sum, value) => sum + value, 0)
+
+    chartPoints.push({
+      label: groupedDays[index].dayLabel,
+      value: total / allValues.length,
     })
+  }
+
+  return chartPoints
 }
 
 function buildPriceSeries(points: DailyMedianPoint[]) {
@@ -165,34 +219,6 @@ function buildPriceSeries(points: DailyMedianPoint[]) {
       label: point.dayLabel,
       value: point.price,
     }))
-}
-
-function buildThreeDayAverageSeries(
-  points: DailyMedianPoint[],
-  macdKey: 'dailyMacd' | 'weeklyMacd',
-) {
-  const chartPoints: ChartPoint[] = []
-
-  for (let index = 2; index < points.length; index += 1) {
-    const window = points.slice(index - 2, index + 1)
-    const macdValues = window.map((point) => point[macdKey])
-
-    if (macdValues.some((value) => value === null)) {
-      continue
-    }
-
-    const numericMacdValues = macdValues.filter(
-      (value): value is number => value !== null,
-    )
-    const total = numericMacdValues.reduce((sum, value) => sum + value, 0)
-
-    chartPoints.push({
-      label: points[index].dayLabel,
-      value: total / numericMacdValues.length,
-    })
-  }
-
-  return chartPoints
 }
 
 function buildScoreSeries(points: DailyMedianPoint[]) {
@@ -271,8 +297,8 @@ function TokenPage() {
   const pageTitle = ticker?.toUpperCase() ?? 'Stock'
   const dailyMedianPoints = getDailyMedianPoints(rows, isCrypto)
   const priceSeries = buildPriceSeries(dailyMedianPoints)
-  const dailyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'dailyMacd')
-  const weeklyMacdSeries = buildThreeDayAverageSeries(dailyMedianPoints, 'weeklyMacd')
+  const dailyMacdSeries = buildThreeDayAverageSeries(rows, isCrypto, 'daily_macd_histogram')
+  const weeklyMacdSeries = buildThreeDayAverageSeries(rows, isCrypto, 'weekly_macd_histogram')
   const strategyOneScoreSeries = buildScoreSeries(dailyMedianPoints)
   const strategyTwoScoreSeries = buildStrategyTwoScoreSeries(dailyMedianPoints)
 

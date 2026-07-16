@@ -64,7 +64,13 @@ function Home() {
       await fetchHomePageData()
       setSecondsUntilRefresh(REFRESH_INTERVAL_SECONDS)
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Failed to recalculate scores'))
+      const errorMessage = getApiErrorMessage(err, 'Failed to recalculate scores')
+
+      if (errorMessage === 'Score recalculation job still running.') {
+        window.alert(errorMessage)
+      } else {
+        setError(errorMessage)
+      }
     } finally {
       setIsRecalculating(false)
     }
