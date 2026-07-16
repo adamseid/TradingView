@@ -8,6 +8,8 @@ export interface TokenHistoryRow {
   resistance: number | null
   support: number | null
   support_resistance_score: number | null
+  sma_50: number | null
+  sma_100: number | null
   sma_200: number | null
   ma_score: number | null
   daily_macd_histogram: number | null

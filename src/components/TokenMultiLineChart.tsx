@@ -6,92 +6,77 @@ interface ChartPoint {
   value: number
 }
 
-interface TokenLineChartProps {
-  data: ChartPoint[]
+interface TokenMultiLineChartDataset {
+  label: string
   color: string
+  data: ChartPoint[]
+}
+
+interface TokenMultiLineChartProps {
+  datasets: TokenMultiLineChartDataset[]
   emptyMessage: string
   title: string
-  datasetLabel: string
   height?: number
   valueFormatter?: (value: number) => string
   showZeroLine?: boolean
-  showLegend?: boolean
-  showTitle?: boolean
-  showAxes?: boolean
-  pointRadius?: number
-  pointHoverRadius?: number
-  borderWidth?: number
 }
 
 function defaultValueFormatter(value: number) {
   return value.toFixed(3)
 }
 
-function hexToRgba(hex: string, alpha: number) {
-  const normalizedHex = hex.replace('#', '')
-  const safeHex =
-    normalizedHex.length === 3
-      ? normalizedHex
-          .split('')
-          .map((char) => `${char}${char}`)
-          .join('')
-      : normalizedHex
-
-  const red = Number.parseInt(safeHex.slice(0, 2), 16)
-  const green = Number.parseInt(safeHex.slice(2, 4), 16)
-  const blue = Number.parseInt(safeHex.slice(4, 6), 16)
-
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
-}
-
-function TokenLineChart({
-  data,
-  color,
+function TokenMultiLineChart({
+  datasets,
   emptyMessage,
   title,
-  datasetLabel,
-  height = 280,
+  height = 320,
   valueFormatter = defaultValueFormatter,
   showZeroLine = false,
-  showLegend = true,
-  showTitle = true,
-  showAxes = true,
-  pointRadius = 3,
-  pointHoverRadius = 5,
-  borderWidth = 3,
-}: TokenLineChartProps) {
+}: TokenMultiLineChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const chartRef = useRef<Chart<'line'> | null>(null)
+  const hasData = datasets.some((dataset) => dataset.data.length > 0)
 
   useEffect(() => {
-    if (!canvasRef.current || data.length === 0) {
+    if (!canvasRef.current || !hasData) {
       return undefined
     }
 
     chartRef.current?.destroy()
 
+    const labels = Array.from(
+      new Set(
+        datasets.flatMap((dataset) => dataset.data.map((point) => point.label)),
+      ),
+    )
+
     const chart = new Chart(canvasRef.current, {
       type: 'line',
       data: {
-        labels: data.map((point) => point.label),
-        datasets: [
-          {
-            label: datasetLabel,
-            data: data.map((point) => point.value),
-            borderColor: color,
-            backgroundColor: hexToRgba(color, 0.2),
-            pointBackgroundColor: color,
-            pointBorderColor: color,
+        labels,
+        datasets: datasets.map((dataset) => {
+          const pointLookup = new Map(
+            dataset.data.map((point) => [point.label, point.value]),
+          )
+
+          return {
+            label: dataset.label,
+            data: labels.map((label) => pointLookup.get(label) ?? null),
+            borderColor: dataset.color,
+            backgroundColor: dataset.color,
+            pointBackgroundColor: dataset.color,
+            pointBorderColor: dataset.color,
             pointHoverBackgroundColor: '#ffffff',
-            pointHoverBorderColor: color,
-            pointRadius,
-            pointHoverRadius,
+            pointHoverBorderColor: dataset.color,
+            pointRadius: 2,
+            pointHoverRadius: 4,
             pointBorderWidth: 2,
-            borderWidth,
+            borderWidth: 2.5,
             tension: 0.25,
             fill: false,
-          },
-        ],
+            spanGaps: false,
+          }
+        }),
       },
       options: {
         responsive: true,
@@ -102,29 +87,26 @@ function TokenLineChart({
         },
         plugins: {
           legend: {
-            display: showLegend,
             position: 'top',
           },
           title: {
-            display: showTitle,
+            display: true,
             text: title,
           },
           tooltip: {
             callbacks: {
               label: (context) =>
-                `${datasetLabel}: ${valueFormatter(context.parsed.y ?? 0)}`,
+                `${context.dataset.label}: ${valueFormatter(context.parsed.y ?? 0)}`,
             },
           },
         },
         scales: {
           x: {
-            display: showAxes,
             grid: {
               display: false,
             },
           },
           y: {
-            display: showAxes,
             ticks: {
               callback: (tickValue) => valueFormatter(Number(tickValue)),
             },
@@ -154,22 +136,9 @@ function TokenLineChart({
       chart.destroy()
       chartRef.current = null
     }
-  }, [
-    borderWidth,
-    color,
-    data,
-    datasetLabel,
-    pointHoverRadius,
-    pointRadius,
-    showAxes,
-    showLegend,
-    showTitle,
-    showZeroLine,
-    title,
-    valueFormatter,
-  ])
+  }, [datasets, hasData, showZeroLine, title, valueFormatter])
 
-  if (data.length === 0) {
+  if (!hasData) {
     return (
       <div
         className="d-flex align-items-center justify-content-center text-muted small rounded border bg-body-tertiary px-3"
@@ -187,4 +156,4 @@ function TokenLineChart({
   )
 }
 
-export default TokenLineChart
+export default TokenMultiLineChart
