@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { formatNumber, formatPercent } from '../utils/formatters'
+import { formatNumber } from '../utils/formatters'
 import type { PerformanceCalculatorDayPoint } from './PerformanceCalculator'
 
 type StrategyKey = 'original' | 'macd'
@@ -71,7 +71,16 @@ function formatMetricPercent(value: number | null) {
     return 'N/A'
   }
 
-  return formatPercent(value, 2, 2)
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${formatNumber(value, 2, 2)}%`
+}
+
+function formatWinRatePercent(value: number | null) {
+  if (value === null) {
+    return 'N/A'
+  }
+
+  return `${formatNumber(value, 2, 2)}%`
 }
 
 function buildBucketMetrics(
@@ -202,8 +211,8 @@ function ScoreValidationStudy({ dailyPoints }: ScoreValidationStudyProps) {
                 <td className={`text-nowrap ${getMetricClassName(row.avg3d)}`}>{formatMetricPercent(row.avg3d)}</td>
                 <td className={`text-nowrap ${getMetricClassName(row.avg5d)}`}>{formatMetricPercent(row.avg5d)}</td>
                 <td className={`text-nowrap ${getMetricClassName(row.avg10d)}`}>{formatMetricPercent(row.avg10d)}</td>
-                <td className={`text-nowrap ${getMetricClassName(row.winRate1d === null ? null : row.winRate1d - 50)}`}>{formatMetricPercent(row.winRate1d)}</td>
-                <td className={`text-nowrap ${getMetricClassName(row.winRate5d === null ? null : row.winRate5d - 50)}`}>{formatMetricPercent(row.winRate5d)}</td>
+                <td className={`text-nowrap ${getMetricClassName(row.winRate1d === null ? null : row.winRate1d - 50)}`}>{formatWinRatePercent(row.winRate1d)}</td>
+                <td className={`text-nowrap ${getMetricClassName(row.winRate5d === null ? null : row.winRate5d - 50)}`}>{formatWinRatePercent(row.winRate5d)}</td>
               </tr>
             ))}
           </tbody>
