@@ -7,6 +7,7 @@ import AppNavbar from '../components/AppNavbar'
 import PerformanceCalculator, {
   type PerformanceCalculatorDayPoint,
 } from '../components/PerformanceCalculator'
+import ScoreValidationStudy from '../components/ScoreValidationStudy'
 import TokenLineChart from '../components/TokenLineChart'
 import TokenMultiLineChart from '../components/TokenMultiLineChart'
 import TokenHistoryTable, { type TokenHistoryRow } from '../components/TokenHistoryTable'
@@ -762,6 +763,13 @@ function TokenPage() {
                   </Accordion.Body>
                 </Accordion.Item>
 
+                <Accordion.Item eventKey="score-validation" className="shadow-sm border-0">
+                  <Accordion.Header>Score Validation</Accordion.Header>
+                  <Accordion.Body>
+                    <ScoreValidationStudy dailyPoints={dailyAveragePoints} />
+                  </Accordion.Body>
+                </Accordion.Item>
+
                 <Accordion.Item eventKey="history" className="shadow-sm border-0">
                   <Accordion.Header>History</Accordion.Header>
                   <Accordion.Body className="p-0">
@@ -789,6 +797,8 @@ function TokenPage() {
 }
 
 export default TokenPage
+
+
 
 
 
