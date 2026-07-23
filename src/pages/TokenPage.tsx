@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Accordion from 'react-bootstrap/Accordion'
 import { useParams } from 'react-router-dom'
 import api, { getApiErrorMessage } from '../api/client'
 
 import AppNavbar from '../components/AppNavbar'
-import PerformanceCalculator from '../components/PerformanceCalculator'
+import PerformanceCalculator, {
+  type PerformanceCalculatorDayPoint,
+} from '../components/PerformanceCalculator'
 import TokenLineChart from '../components/TokenLineChart'
 import TokenMultiLineChart from '../components/TokenMultiLineChart'
 import TokenHistoryTable, { type TokenHistoryRow } from '../components/TokenHistoryTable'
@@ -39,46 +41,69 @@ interface PreparedRow {
   dayLabel: string
   weekday: string
   hour: number
+  year: number
+  month: number
+  day: number
 }
 
-interface DailyMedianPoint {
-  dayKey: string
-  dayLabel: string
-  price: number | null
-  dailyMacd: number | null
-  weeklyMacd: number | null
-  sma50: number | null
-  sma100: number | null
-  sma200: number | null
-  strategyOneScore: number | null
-  strategyTwoScore: number | null
-}
-
-interface DayMetricBuckets {
+interface MetricBuckets {
   price: number[]
   dailyMacd: number[]
   weeklyMacd: number[]
   sma50: number[]
   sma100: number[]
   sma200: number[]
-  strategyOneScore: number[]
-  strategyTwoScore: number[]
+  originalStrategyScore: number[]
+  macdStrategyScore: number[]
 }
 
-interface ChartSeriesCollection {
-  dailyMedianPoints: DailyMedianPoint[]
-  medianPriceSeries: ChartPoint[]
-  medianDailyMacdSeries: ChartPoint[]
-  medianWeeklyMacdSeries: ChartPoint[]
-  medianStrategyOneScoreSeries: ChartPoint[]
-  medianStrategyTwoScoreSeries: ChartPoint[]
-  averageDailyMacdSeries: ChartPoint[]
-  averageWeeklyMacdSeries: ChartPoint[]
-  strategyOneMovingAverageDatasets: ChartDataset[]
-  strategyTwoMovingAverageDatasets: ChartDataset[]
+interface AggregatedPoint {
+  bucketKey: string
+  label: string
+  price: number | null
+  dailyMacd: number | null
+  weeklyMacd: number | null
+  sma50: number | null
+  sma100: number | null
+  sma200: number | null
+  originalStrategyScore: number | null
+  macdStrategyScore: number | null
 }
+
+interface TimeframeChartBundle {
+  priceSeries: ChartPoint[]
+  dailyMacdSeries: ChartPoint[]
+  weeklyMacdSeries: ChartPoint[]
+  movingAverageDatasets: ChartDataset[]
+  scoreSeries: ChartPoint[]
+}
+
+type StrategyKey = 'original' | 'macd'
+type TimeframeKey = '1h' | '4h' | '1d' | '1w' | '1m'
+
+interface TimeframeOption {
+  key: TimeframeKey
+  label: string
+}
+
+interface TimeframeSectionData {
+  key: TimeframeKey
+  label: string
+  points: AggregatedPoint[]
+  originalCharts: TimeframeChartBundle
+  macdCharts: TimeframeChartBundle
+}
+
+const TIMEFRAME_OPTIONS: TimeframeOption[] = [
+  { key: '1h', label: '1 hour' },
+  { key: '4h', label: '4 hour' },
+  { key: '1d', label: '1 day' },
+  { key: '1w', label: '1 week' },
+  { key: '1m', label: '1 month' },
+]
 
 const EASTERN_TIME_ZONE = 'America/New_York'
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 const EASTERN_PARTS_FORMATTER = new Intl.DateTimeFormat('en-US', {
   timeZone: EASTERN_TIME_ZONE,
   year: 'numeric',
@@ -88,11 +113,6 @@ const EASTERN_PARTS_FORMATTER = new Intl.DateTimeFormat('en-US', {
   hour: '2-digit',
   minute: '2-digit',
   hourCycle: 'h23',
-})
-const EASTERN_DAY_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  timeZone: EASTERN_TIME_ZONE,
-  month: 'short',
-  day: 'numeric',
 })
 
 function getEasternDateParts(value: string) {
@@ -117,11 +137,38 @@ function getEasternDateParts(value: string) {
 
   return {
     timestamp,
+    year: Number(year),
+    month: Number(month),
+    day: Number(day),
     dayKey: `${year}-${month}-${day}`,
-    dayLabel: EASTERN_DAY_LABEL_FORMATTER.format(date),
+    dayLabel: `${MONTH_LABELS[Number(month) - 1]} ${Number(day)}`,
     weekday,
     hour: Number(hour),
   }
+}
+
+function padTwoDigits(value: number) {
+  return String(value).padStart(2, '0')
+}
+
+function formatMonthDay(month: number, day: number) {
+  return `${MONTH_LABELS[month - 1]} ${day}`
+}
+
+function formatHourLabel(month: number, day: number, hour: number) {
+  return `${formatMonthDay(month, day)} ${padTwoDigits(hour)}:00`
+}
+
+function formatMonthLabel(month: number, year: number) {
+  return `${MONTH_LABELS[month - 1]} ${year}`
+}
+
+function getWeekStartDate(year: number, month: number, day: number) {
+  const currentDate = new Date(Date.UTC(year, month - 1, day))
+  const weekday = currentDate.getUTCDay()
+  const offset = weekday === 0 ? 6 : weekday - 1
+  currentDate.setUTCDate(currentDate.getUTCDate() - offset)
+  return currentDate
 }
 
 function toNumericValue(value: number | string | null | undefined) {
@@ -162,30 +209,15 @@ function prepareRows(rows: TokenHistoryRow[], isCrypto: boolean) {
         dayLabel: dateParts.dayLabel,
         weekday: dateParts.weekday,
         hour: dateParts.hour,
+        year: dateParts.year,
+        month: dateParts.month,
+        day: dateParts.day,
       }
     })
     .filter((entry): entry is PreparedRow => entry !== null)
 }
 
-function getMedianValue(values: Array<number | null>) {
-  const numericValues = values
-    .filter((value): value is number => value !== null)
-    .sort((left, right) => left - right)
-
-  if (numericValues.length === 0) {
-    return null
-  }
-
-  const middleIndex = Math.floor(numericValues.length / 2)
-
-  if (numericValues.length % 2 === 1) {
-    return numericValues[middleIndex]
-  }
-
-  return (numericValues[middleIndex - 1] + numericValues[middleIndex]) / 2
-}
-
-function createDayMetricBuckets(): DayMetricBuckets {
+function createMetricBuckets(): MetricBuckets {
   return {
     price: [],
     dailyMacd: [],
@@ -193,8 +225,8 @@ function createDayMetricBuckets(): DayMetricBuckets {
     sma50: [],
     sma100: [],
     sma200: [],
-    strategyOneScore: [],
-    strategyTwoScore: [],
+    originalStrategyScore: [],
+    macdStrategyScore: [],
   }
 }
 
@@ -214,129 +246,178 @@ function getAverageValue(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length
 }
 
-function buildChartSeries(rows: TokenHistoryRow[], isCrypto: boolean): ChartSeriesCollection {
-  const preparedRows = prepareRows(rows, isCrypto)
-  const dayMap = new Map<string, { dayKey: string; dayLabel: string; metrics: DayMetricBuckets }>()
+function getBucketMetadata(row: PreparedRow, timeframe: TimeframeKey) {
+  switch (timeframe) {
+    case '1h':
+      return {
+        key: `${row.dayKey}-${padTwoDigits(row.hour)}`,
+        label: formatHourLabel(row.month, row.day, row.hour),
+        startTimestamp: Date.UTC(row.year, row.month - 1, row.day, row.hour),
+      }
+    case '4h': {
+      const startHour = Math.floor(row.hour / 4) * 4
+      return {
+        key: `${row.dayKey}-${padTwoDigits(startHour)}`,
+        label: formatHourLabel(row.month, row.day, startHour),
+        startTimestamp: Date.UTC(row.year, row.month - 1, row.day, startHour),
+      }
+    }
+    case '1d':
+      return {
+        key: row.dayKey,
+        label: row.dayLabel,
+        startTimestamp: Date.UTC(row.year, row.month - 1, row.day),
+      }
+    case '1w': {
+      const weekStart = getWeekStartDate(row.year, row.month, row.day)
+      const month = weekStart.getUTCMonth() + 1
+      const day = weekStart.getUTCDate()
+      return {
+        key: weekStart.toISOString().slice(0, 10),
+        label: `Week of ${formatMonthDay(month, day)}`,
+        startTimestamp: weekStart.getTime(),
+      }
+    }
+    case '1m':
+      return {
+        key: `${row.year}-${padTwoDigits(row.month)}`,
+        label: formatMonthLabel(row.month, row.year),
+        startTimestamp: Date.UTC(row.year, row.month - 1, 1),
+      }
+  }
+}
 
-  preparedRows.forEach((entry) => {
-    const existingDay = dayMap.get(entry.dayKey) ?? {
-      dayKey: entry.dayKey,
-      dayLabel: entry.dayLabel,
-      metrics: createDayMetricBuckets(),
+function aggregatePoints(preparedRows: PreparedRow[], timeframe: TimeframeKey) {
+  const bucketMap = new Map<string, { key: string; label: string; startTimestamp: number; metrics: MetricBuckets }>()
+
+  preparedRows.forEach((row) => {
+    const bucket = getBucketMetadata(row, timeframe)
+    const existingBucket = bucketMap.get(bucket.key) ?? {
+      key: bucket.key,
+      label: bucket.label,
+      startTimestamp: bucket.startTimestamp,
+      metrics: createMetricBuckets(),
     }
 
-    appendNumericValue(existingDay.metrics.price, entry.row.current_price)
-    appendNumericValue(existingDay.metrics.dailyMacd, entry.row.daily_macd_histogram)
-    appendNumericValue(existingDay.metrics.weeklyMacd, entry.row.weekly_macd_histogram)
-    appendNumericValue(existingDay.metrics.sma50, entry.row.sma_50)
-    appendNumericValue(existingDay.metrics.sma100, entry.row.sma_100)
-    appendNumericValue(existingDay.metrics.sma200, entry.row.sma_200)
-    appendNumericValue(existingDay.metrics.strategyOneScore, entry.row.strategy_one_score)
-    appendNumericValue(existingDay.metrics.strategyTwoScore, entry.row.strategy_two_score)
+    appendNumericValue(existingBucket.metrics.price, row.row.current_price)
+    appendNumericValue(existingBucket.metrics.dailyMacd, row.row.daily_macd_histogram)
+    appendNumericValue(existingBucket.metrics.weeklyMacd, row.row.weekly_macd_histogram)
+    appendNumericValue(existingBucket.metrics.sma50, row.row.sma_50)
+    appendNumericValue(existingBucket.metrics.sma100, row.row.sma_100)
+    appendNumericValue(existingBucket.metrics.sma200, row.row.sma_200)
+    appendNumericValue(existingBucket.metrics.originalStrategyScore, row.row.original_strategy_score)
+    appendNumericValue(existingBucket.metrics.macdStrategyScore, row.row.macd_strategy_score)
 
-    dayMap.set(entry.dayKey, existingDay)
+    bucketMap.set(bucket.key, existingBucket)
   })
 
-  const sortedDays = [...dayMap.values()].sort((left, right) =>
-    left.dayKey.localeCompare(right.dayKey),
-  )
+  return [...bucketMap.values()]
+    .sort((left, right) => left.startTimestamp - right.startTimestamp)
+    .map((bucket) => ({
+      bucketKey: bucket.key,
+      label: bucket.label,
+      price: getAverageValue(bucket.metrics.price),
+      dailyMacd: getAverageValue(bucket.metrics.dailyMacd),
+      weeklyMacd: getAverageValue(bucket.metrics.weeklyMacd),
+      sma50: getAverageValue(bucket.metrics.sma50),
+      sma100: getAverageValue(bucket.metrics.sma100),
+      sma200: getAverageValue(bucket.metrics.sma200),
+      originalStrategyScore: getAverageValue(bucket.metrics.originalStrategyScore),
+      macdStrategyScore: getAverageValue(bucket.metrics.macdStrategyScore),
+    }))
+}
 
-  const dailyMedianPoints: DailyMedianPoint[] = sortedDays.map((day) => ({
-    dayKey: day.dayKey,
-    dayLabel: day.dayLabel,
-    price: getMedianValue(day.metrics.price),
-    dailyMacd: getMedianValue(day.metrics.dailyMacd),
-    weeklyMacd: getMedianValue(day.metrics.weeklyMacd),
-    sma50: getMedianValue(day.metrics.sma50),
-    sma100: getMedianValue(day.metrics.sma100),
-    sma200: getMedianValue(day.metrics.sma200),
-    strategyOneScore: getMedianValue(day.metrics.strategyOneScore),
-    strategyTwoScore: getMedianValue(day.metrics.strategyTwoScore),
-  }))
+function buildSeries(points: AggregatedPoint[], selector: (point: AggregatedPoint) => number | null) {
+  return points.flatMap((point) => {
+    const value = selector(point)
 
-  const buildMedianSeries = (selector: (point: DailyMedianPoint) => number | null) => {
-    const chartPoints: ChartPoint[] = []
+    if (value === null) {
+      return []
+    }
 
-    dailyMedianPoints.forEach((point) => {
-      const value = selector(point)
+    return [{
+      label: point.label,
+      value,
+    }]
+  })
+}
 
-      if (value !== null) {
-        chartPoints.push({
-          label: point.dayLabel,
-          value,
-        })
-      }
-    })
+function buildTimeframeCharts(points: AggregatedPoint[], strategy: StrategyKey): TimeframeChartBundle {
+  const scoreSelector = strategy === 'original'
+    ? (point: AggregatedPoint) => point.originalStrategyScore
+    : (point: AggregatedPoint) => point.macdStrategyScore
 
-    return chartPoints
+  return {
+    priceSeries: buildSeries(points, (point) => point.price),
+    dailyMacdSeries: buildSeries(points, (point) => point.dailyMacd),
+    weeklyMacdSeries: buildSeries(points, (point) => point.weeklyMacd),
+    movingAverageDatasets: [
+      {
+        label: 'MA 50D',
+        color: '#0d6efd',
+        data: buildSeries(points, (point) => point.sma50),
+      },
+      {
+        label: 'MA 100D',
+        color: '#198754',
+        data: buildSeries(points, (point) => point.sma100),
+      },
+      {
+        label: 'MA 200D',
+        color: '#fd7e14',
+        data: buildSeries(points, (point) => point.sma200),
+      },
+    ],
+    scoreSeries: buildSeries(points, scoreSelector),
+  }
+}
+
+function buildStreakLabel(streak: number) {
+  if (streak > 0) {
+    return `+${streak} days`
   }
 
-  const buildThreeDayAverageSeries = (metricKey: keyof DayMetricBuckets) => {
-    const chartPoints: ChartPoint[] = []
+  if (streak < 0) {
+    return `${streak} days`
+  }
 
-    for (let index = 2; index < sortedDays.length; index += 1) {
-      const windowValues = sortedDays
-        .slice(index - 2, index + 1)
-        .flatMap((day) => day.metrics[metricKey])
-      const averageValue = getAverageValue(windowValues)
+  return '0 days'
+}
 
-      if (averageValue === null) {
+function getScoreStreak(points: AggregatedPoint[], strategy: StrategyKey) {
+  const selector = strategy === 'original'
+    ? (point: AggregatedPoint) => point.originalStrategyScore
+    : (point: AggregatedPoint) => point.macdStrategyScore
+
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const currentValue = selector(points[index])
+
+    if (currentValue === null || currentValue === 50) {
+      continue
+    }
+
+    const isPositive = currentValue > 50
+    let count = 0
+
+    for (let innerIndex = index; innerIndex >= 0; innerIndex -= 1) {
+      const value = selector(points[innerIndex])
+
+      if (value === null || value === 50) {
+        break
+      }
+
+      if ((isPositive && value > 50) || (!isPositive && value < 50)) {
+        count += 1
         continue
       }
 
-      chartPoints.push({
-        label: sortedDays[index].dayLabel,
-        value: averageValue,
-      })
+      break
     }
 
-    return chartPoints
+    return isPositive ? count : count * -1
   }
 
-  return {
-    dailyMedianPoints,
-    medianPriceSeries: buildMedianSeries((point) => point.price),
-    medianDailyMacdSeries: buildMedianSeries((point) => point.dailyMacd),
-    medianWeeklyMacdSeries: buildMedianSeries((point) => point.weeklyMacd),
-    medianStrategyOneScoreSeries: buildMedianSeries((point) => point.strategyOneScore),
-    medianStrategyTwoScoreSeries: buildMedianSeries((point) => point.strategyTwoScore),
-    averageDailyMacdSeries: buildThreeDayAverageSeries('dailyMacd'),
-    averageWeeklyMacdSeries: buildThreeDayAverageSeries('weeklyMacd'),
-    strategyOneMovingAverageDatasets: [
-      {
-        label: 'MA 50D',
-        color: '#0d6efd',
-        data: buildMedianSeries((point) => point.sma50),
-      },
-      {
-        label: 'MA 100D',
-        color: '#198754',
-        data: buildMedianSeries((point) => point.sma100),
-      },
-      {
-        label: 'MA 200D',
-        color: '#fd7e14',
-        data: buildMedianSeries((point) => point.sma200),
-      },
-    ],
-    strategyTwoMovingAverageDatasets: [
-      {
-        label: 'MA 50D',
-        color: '#0d6efd',
-        data: buildThreeDayAverageSeries('sma50'),
-      },
-      {
-        label: 'MA 100D',
-        color: '#198754',
-        data: buildThreeDayAverageSeries('sma100'),
-      },
-      {
-        label: 'MA 200D',
-        color: '#fd7e14',
-        data: buildThreeDayAverageSeries('sma200'),
-      },
-    ],
-  }
+  return 0
 }
 
 function formatPriceValue(value: number) {
@@ -355,20 +436,32 @@ function formatScoreValue(value: number) {
   return formatNumber(value, 2, 2)
 }
 
-function TokenAccordionHeader({
+function StrategyAccordionHeader({
   title,
+  streak,
   previewData,
   color,
   datasetLabel,
 }: {
   title: string
+  streak: number
   previewData: ChartPoint[]
   color: string
   datasetLabel: string
 }) {
+  const streakClassName = streak > 0
+    ? 'text-bg-success'
+    : streak < 0
+      ? 'text-bg-danger'
+      : 'text-bg-secondary'
+
   return (
-    <div className="d-flex align-items-center justify-content-between gap-3 w-100 pe-3">
-      <span className="fw-semibold">{title}</span>
+    <div className="d-flex align-items-center justify-content-between gap-3 w-100 pe-3 flex-wrap flex-md-nowrap">
+      <div className="d-flex align-items-center gap-2 flex-wrap">
+        <span className="fw-semibold">{title}</span>
+        <span className={`badge ${streakClassName}`}>{buildStreakLabel(streak)}</span>
+      </div>
+
       <div style={{ width: 220, minWidth: 180, pointerEvents: 'none' }}>
         <TokenLineChart
           data={previewData}
@@ -378,7 +471,6 @@ function TokenAccordionHeader({
           datasetLabel={datasetLabel}
           height={64}
           valueFormatter={formatScoreValue}
-          showZeroLine
           showLegend={false}
           showTitle={false}
           showAxes={false}
@@ -388,6 +480,85 @@ function TokenAccordionHeader({
         />
       </div>
     </div>
+  )
+}
+
+function StrategyTimeframeContent({
+  title,
+  timeframeSections,
+  strategy,
+}: {
+  title: string
+  timeframeSections: TimeframeSectionData[]
+  strategy: StrategyKey
+}) {
+  return (
+    <Accordion alwaysOpen className="d-flex flex-column gap-3">
+      {timeframeSections.map((section) => {
+        const charts = strategy === 'original' ? section.originalCharts : section.macdCharts
+        const scoreTitle = strategy === 'original' ? 'Original Strategy Score' : 'MACD 3 Day Strategy Score'
+
+        return (
+          <Accordion.Item key={`${strategy}-${section.key}`} eventKey={`${strategy}-${section.key}`} className="shadow-sm border-0">
+            <Accordion.Header>{section.label}</Accordion.Header>
+            <Accordion.Body>
+              <div className="d-flex flex-column gap-4">
+                <TokenLineChart
+                  data={charts.priceSeries}
+                  color="#0d6efd"
+                  emptyMessage={`No ${section.label.toLowerCase()} average price data available.`}
+                  title="Average Price"
+                  datasetLabel="Price"
+                  height={320}
+                  valueFormatter={formatPriceValue}
+                />
+
+                <TokenLineChart
+                  data={charts.dailyMacdSeries}
+                  color="#198754"
+                  emptyMessage={`No ${section.label.toLowerCase()} daily MACD data available.`}
+                  title="Average Daily MACD"
+                  datasetLabel="Daily MACD"
+                  height={320}
+                  valueFormatter={formatMacdValue}
+                  showZeroLine
+                />
+
+                <TokenLineChart
+                  data={charts.weeklyMacdSeries}
+                  color="#dc3545"
+                  emptyMessage={`No ${section.label.toLowerCase()} weekly MACD data available.`}
+                  title="Average Weekly MACD"
+                  datasetLabel="Weekly MACD"
+                  height={320}
+                  valueFormatter={formatMacdValue}
+                  showZeroLine
+                />
+
+                <TokenMultiLineChart
+                  datasets={charts.movingAverageDatasets}
+                  emptyMessage={`No ${section.label.toLowerCase()} moving average data available.`}
+                  title="Average Moving Averages"
+                  height={320}
+                  valueFormatter={formatPriceValue}
+                />
+
+                <TokenLineChart
+                  data={charts.scoreSeries}
+                  color={strategy === 'original' ? '#6f42c1' : '#fd7e14'}
+                  emptyMessage={`No ${section.label.toLowerCase()} ${title.toLowerCase()} score data available.`}
+                  title={`Average ${scoreTitle}`}
+                  datasetLabel={scoreTitle}
+                  height={320}
+                  valueFormatter={formatScoreValue}
+                  showZeroLine
+                />
+              </div>
+            </Accordion.Body>
+          </Accordion.Item>
+        )
+      })}
+    </Accordion>
   )
 }
 
@@ -425,18 +596,37 @@ function TokenPage() {
   const exchange = rows[0]?.exchange ?? ''
   const isCrypto = rows[0]?.screener?.toLowerCase() === 'crypto'
   const pageTitle = ticker?.toUpperCase() ?? 'Stock'
-  const {
-    dailyMedianPoints,
-    medianPriceSeries,
-    medianDailyMacdSeries,
-    medianWeeklyMacdSeries,
-    medianStrategyOneScoreSeries,
-    medianStrategyTwoScoreSeries,
-    averageDailyMacdSeries,
-    averageWeeklyMacdSeries,
-    strategyOneMovingAverageDatasets,
-    strategyTwoMovingAverageDatasets,
-  } = buildChartSeries(rows, isCrypto)
+
+  const preparedRows = useMemo(() => prepareRows(rows, isCrypto), [rows, isCrypto])
+
+  const timeframeSections = useMemo(() => {
+    return TIMEFRAME_OPTIONS.map((timeframe) => {
+      const points = aggregatePoints(preparedRows, timeframe.key)
+      return {
+        key: timeframe.key,
+        label: timeframe.label,
+        points,
+        originalCharts: buildTimeframeCharts(points, 'original'),
+        macdCharts: buildTimeframeCharts(points, 'macd'),
+      }
+    })
+  }, [preparedRows])
+
+  const dailyTimeframeSection = timeframeSections.find((section) => section.key === '1d') ?? null
+  const dailyAveragePoints: PerformanceCalculatorDayPoint[] = dailyTimeframeSection
+    ? dailyTimeframeSection.points.map((point) => ({
+        dayKey: point.bucketKey,
+        dayLabel: point.label,
+        price: point.price,
+        originalStrategyScore: point.originalStrategyScore,
+        macdStrategyScore: point.macdStrategyScore,
+      }))
+    : []
+
+  const originalPreviewData = dailyTimeframeSection?.originalCharts.scoreSeries ?? []
+  const macdPreviewData = dailyTimeframeSection?.macdCharts.scoreSeries ?? []
+  const originalStreak = dailyTimeframeSection ? getScoreStreak(dailyTimeframeSection.points, 'original') : 0
+  const macdStreak = dailyTimeframeSection ? getScoreStreak(dailyTimeframeSection.points, 'macd') : 0
 
   return (
     <>
@@ -471,11 +661,7 @@ function TokenPage() {
             {loading && (
               <div className="card border-0 shadow-sm">
                 <div className="card-body py-5 text-center">
-                  <div
-                    className="spinner-border"
-                    role="status"
-                    aria-hidden="true"
-                  ></div>
+                  <div className="spinner-border" role="status" aria-hidden="true"></div>
                   <p className="mt-3 mb-0 text-muted">Loading stock detail...</p>
                 </div>
               </div>
@@ -492,137 +678,45 @@ function TokenPage() {
                 <Accordion.Item eventKey="performance" className="shadow-sm border-0">
                   <Accordion.Header>Performance calculator</Accordion.Header>
                   <Accordion.Body>
-                    <PerformanceCalculator dailyPoints={dailyMedianPoints} />
+                    <PerformanceCalculator dailyPoints={dailyAveragePoints} />
                   </Accordion.Body>
                 </Accordion.Item>
 
-                <Accordion.Item eventKey="strategy-1" className="shadow-sm border-0">
+                <Accordion.Item eventKey="original-strategy" className="shadow-sm border-0">
                   <Accordion.Header>
-                    <TokenAccordionHeader
-                      title="Strategy 1"
-                      previewData={medianStrategyOneScoreSeries}
+                    <StrategyAccordionHeader
+                      title="Original strategy"
+                      streak={originalStreak}
+                      previewData={originalPreviewData}
                       color="#6f42c1"
-                      datasetLabel="Score 1"
+                      datasetLabel="Original Strategy Score"
                     />
                   </Accordion.Header>
                   <Accordion.Body>
-                    <div className="d-flex flex-column gap-4">
-                      <TokenLineChart
-                        data={medianPriceSeries}
-                        color="#0d6efd"
-                        emptyMessage="No median price data available."
-                        title="Median Price"
-                        datasetLabel="Price"
-                        height={320}
-                        valueFormatter={formatPriceValue}
-                      />
-
-                      <TokenLineChart
-                        data={medianDailyMacdSeries}
-                        color="#198754"
-                        emptyMessage="No median daily MACD data available."
-                        title="Median Daily MACD"
-                        datasetLabel="Daily MACD"
-                        height={320}
-                        valueFormatter={formatMacdValue}
-                        showZeroLine
-                      />
-
-                      <TokenLineChart
-                        data={medianWeeklyMacdSeries}
-                        color="#dc3545"
-                        emptyMessage="No median weekly MACD data available."
-                        title="Median Weekly MACD"
-                        datasetLabel="Weekly MACD"
-                        height={320}
-                        valueFormatter={formatMacdValue}
-                        showZeroLine
-                      />
-
-                      <TokenMultiLineChart
-                        datasets={strategyOneMovingAverageDatasets}
-                        emptyMessage="No median moving average data available."
-                        title="Median Moving Averages"
-                        height={320}
-                        valueFormatter={formatPriceValue}
-                      />
-
-                      <TokenLineChart
-                        data={medianStrategyOneScoreSeries}
-                        color="#6f42c1"
-                        emptyMessage="No median score 1 data available."
-                        title="Median Score 1"
-                        datasetLabel="Score 1"
-                        height={320}
-                        valueFormatter={formatScoreValue}
-                        showZeroLine
-                      />
-                    </div>
+                    <StrategyTimeframeContent
+                      title="Original strategy"
+                      timeframeSections={timeframeSections}
+                      strategy="original"
+                    />
                   </Accordion.Body>
                 </Accordion.Item>
 
-                <Accordion.Item eventKey="strategy-2" className="shadow-sm border-0">
+                <Accordion.Item eventKey="macd-strategy" className="shadow-sm border-0">
                   <Accordion.Header>
-                    <TokenAccordionHeader
-                      title="Strategy 2"
-                      previewData={medianStrategyTwoScoreSeries}
+                    <StrategyAccordionHeader
+                      title="MACD 3 day strategy"
+                      streak={macdStreak}
+                      previewData={macdPreviewData}
                       color="#fd7e14"
-                      datasetLabel="Score 2"
+                      datasetLabel="MACD 3 Day Strategy Score"
                     />
                   </Accordion.Header>
                   <Accordion.Body>
-                    <div className="d-flex flex-column gap-4">
-                      <TokenLineChart
-                        data={medianPriceSeries}
-                        color="#0d6efd"
-                        emptyMessage="No median price data available."
-                        title="Median Price"
-                        datasetLabel="Price"
-                        height={320}
-                        valueFormatter={formatPriceValue}
-                      />
-
-                      <TokenLineChart
-                        data={averageDailyMacdSeries}
-                        color="#198754"
-                        emptyMessage="Need at least 3 days of daily MACD data."
-                        title="3-Day Average Daily MACD"
-                        datasetLabel="Daily MACD"
-                        height={320}
-                        valueFormatter={formatMacdValue}
-                        showZeroLine
-                      />
-
-                      <TokenLineChart
-                        data={averageWeeklyMacdSeries}
-                        color="#dc3545"
-                        emptyMessage="Need at least 3 days of weekly MACD data."
-                        title="3-Day Average Weekly MACD"
-                        datasetLabel="Weekly MACD"
-                        height={320}
-                        valueFormatter={formatMacdValue}
-                        showZeroLine
-                      />
-
-                      <TokenMultiLineChart
-                        datasets={strategyTwoMovingAverageDatasets}
-                        emptyMessage="Need at least 3 days of moving average data."
-                        title="3-Day Average Moving Averages"
-                        height={320}
-                        valueFormatter={formatPriceValue}
-                      />
-
-                      <TokenLineChart
-                        data={medianStrategyTwoScoreSeries}
-                        color="#fd7e14"
-                        emptyMessage="No median score 2 data available."
-                        title="Median Score 2"
-                        datasetLabel="Score 2"
-                        height={320}
-                        valueFormatter={formatScoreValue}
-                        showZeroLine
-                      />
-                    </div>
+                    <StrategyTimeframeContent
+                      title="MACD 3 day strategy"
+                      timeframeSections={timeframeSections}
+                      strategy="macd"
+                    />
                   </Accordion.Body>
                 </Accordion.Item>
 
@@ -637,10 +731,7 @@ function TokenPage() {
                   <Accordion.Header>TradingView Chart</Accordion.Header>
                   <Accordion.Body>
                     {ticker && exchange ? (
-                      <TradingViewWidget
-                        ticker={ticker.toUpperCase()}
-                        exchange={exchange}
-                      />
+                      <TradingViewWidget ticker={ticker.toUpperCase()} exchange={exchange} />
                     ) : (
                       <div className="text-muted">No chart data available.</div>
                     )}

@@ -6,8 +6,8 @@ export interface PerformanceCalculatorDayPoint {
   dayKey: string
   dayLabel: string
   price: number | null
-  strategyOneScore: number | null
-  strategyTwoScore: number | null
+  originalStrategyScore: number | null
+  macdStrategyScore: number | null
 }
 
 type DepositFrequency = 'daily' | 'weekly' | 'monthly'
@@ -31,34 +31,23 @@ interface SimulationResult {
   chartData: Array<{ label: string; value: number }>
 }
 
-const POSITIVE_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const
-const NEGATIVE_LEVELS = [-1, -2, -3, -4, -5, -6, -7, -8, -9] as const
+const SCORE_BUCKETS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const
 
 function buildDefaultAllocationMap() {
   return {
-    standard: '50',
     dca: '10',
-    positive: {
-      1: '45',
-      2: '40',
-      3: '35',
-      4: '30',
-      5: '25',
-      6: '20',
-      7: '15',
-      8: '10',
-      9: '5',
-    } as Record<number, string>,
-    negative: {
-      [-1]: '55',
-      [-2]: '60',
-      [-3]: '65',
-      [-4]: '70',
-      [-5]: '75',
-      [-6]: '80',
-      [-7]: '85',
-      [-8]: '90',
-      [-9]: '95',
+    allocations: {
+      0: '95',
+      10: '85',
+      20: '75',
+      30: '65',
+      40: '55',
+      50: '50',
+      60: '45',
+      70: '35',
+      80: '25',
+      90: '15',
+      100: '5',
     } as Record<number, string>,
   }
 }
@@ -82,26 +71,26 @@ function resolveStrategyScore(
   dayPoint: PerformanceCalculatorDayPoint,
   strategy: StrategyOption,
 ) {
-  const scoreOne = dayPoint.strategyOneScore
-  const scoreTwo = dayPoint.strategyTwoScore
+  const originalScore = dayPoint.originalStrategyScore
+  const macdScore = dayPoint.macdStrategyScore
 
   if (strategy === 'strategy1') {
-    return scoreOne ?? 0
+    return originalScore ?? 50
   }
 
   if (strategy === 'strategy2') {
-    return scoreTwo ?? 0
+    return macdScore ?? 50
   }
 
-  if (scoreOne !== null && scoreTwo !== null) {
-    return (scoreOne + scoreTwo) / 2
+  if (originalScore !== null && macdScore !== null) {
+    return (originalScore + macdScore) / 2
   }
 
-  return scoreOne ?? scoreTwo ?? 0
+  return originalScore ?? macdScore ?? 50
 }
 
 function clampScoreToBucket(score: number) {
-  return Math.max(-9, Math.min(9, Math.round(score)))
+  return Math.max(0, Math.min(100, Math.round(score / 10) * 10))
 }
 
 function parseDay(value: string) {
@@ -137,21 +126,8 @@ function shouldApplyRecurringDeposit(
   )
 }
 
-function buildTargetCashAllocation(
-  scoreBucket: number,
-  standardCashAllocation: number,
-  positiveAllocations: Record<number, string>,
-  negativeAllocations: Record<number, string>,
-) {
-  if (scoreBucket > 0) {
-    return parsePercentage(positiveAllocations[scoreBucket] ?? `${standardCashAllocation}`)
-  }
-
-  if (scoreBucket < 0) {
-    return parsePercentage(negativeAllocations[scoreBucket] ?? `${standardCashAllocation}`)
-  }
-
-  return standardCashAllocation
+function buildTargetCashAllocation(scoreBucket: number, allocations: Record<number, string>) {
+  return parsePercentage(allocations[scoreBucket] ?? '50')
 }
 
 function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
@@ -159,10 +135,8 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
   const [initialInvestment, setInitialInvestment] = useState('1000')
   const [recurringDeposit, setRecurringDeposit] = useState('0')
   const [depositFrequency, setDepositFrequency] = useState<DepositFrequency>('weekly')
-  const [standardCashAllocation, setStandardCashAllocation] = useState(defaultAllocations.standard)
   const [dcaPercent, setDcaPercent] = useState(defaultAllocations.dca)
-  const [positiveAllocations, setPositiveAllocations] = useState(defaultAllocations.positive)
-  const [negativeAllocations, setNegativeAllocations] = useState(defaultAllocations.negative)
+  const [allocations, setAllocations] = useState(defaultAllocations.allocations)
   const [strategy, setStrategy] = useState<StrategyOption>('strategy1')
   const [result, setResult] = useState<SimulationResult | null>(null)
 
@@ -170,17 +144,10 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
     .filter((point): point is PerformanceCalculatorDayPoint & { price: number } => point.price !== null)
     .sort((left, right) => left.dayKey.localeCompare(right.dayKey))
 
-  const handlePositiveAllocationChange = (level: number, value: string) => {
-    setPositiveAllocations((current) => ({
+  const handleAllocationChange = (scoreBucket: number, value: string) => {
+    setAllocations((current) => ({
       ...current,
-      [level]: value,
-    }))
-  }
-
-  const handleNegativeAllocationChange = (level: number, value: string) => {
-    setNegativeAllocations((current) => ({
-      ...current,
-      [level]: value,
+      [scoreBucket]: value,
     }))
   }
 
@@ -189,7 +156,6 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
 
     const startingCash = parseAmount(initialInvestment)
     const recurringDepositAmount = parseAmount(recurringDeposit)
-    const neutralCashAllocation = parsePercentage(standardCashAllocation)
     const maxDailyTradePercent = parsePercentage(dcaPercent)
 
     let cash = startingCash
@@ -219,12 +185,7 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
 
       const strategyScore = resolveStrategyScore(dayPoint, strategy)
       const scoreBucket = clampScoreToBucket(strategyScore)
-      const targetCashAllocation = buildTargetCashAllocation(
-        scoreBucket,
-        neutralCashAllocation,
-        positiveAllocations,
-        negativeAllocations,
-      )
+      const targetCashAllocation = buildTargetCashAllocation(scoreBucket, allocations)
 
       const portfolioValueBeforeTrade = cash + (shares * dayPoint.price)
       const targetCashValue = portfolioValueBeforeTrade * (targetCashAllocation / 100)
@@ -325,21 +286,7 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
           </div>
         </div>
 
-        <div className="row g-3">
-          <div className="col-12 col-md-6">
-            <label htmlFor="standard-cash-allocation" className="form-label">Standard cash allocation (%)</label>
-            <input
-              id="standard-cash-allocation"
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              className="form-control"
-              value={standardCashAllocation}
-              onChange={(event) => setStandardCashAllocation(event.target.value)}
-            />
-          </div>
-
+        <div className="row g-3 align-items-end">
           <div className="col-12 col-md-6">
             <label htmlFor="dca-percent" className="form-label">DCA (%)</label>
             <input
@@ -353,75 +300,45 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
               onChange={(event) => setDcaPercent(event.target.value)}
             />
           </div>
+
+          <div className="col-12 col-md-6">
+            <div className="small text-muted border rounded bg-body-tertiary px-3 py-2">
+              Score 50 is neutral. Scores are rounded to the nearest 10-point cash-allocation bucket.
+            </div>
+          </div>
         </div>
 
         <div className="row g-3">
-          {POSITIVE_LEVELS.slice(0, 5).map((level) => (
-            <div className="col-6 col-md" key={`positive-${level}`}>
-              <label htmlFor={`positive-${level}`} className="form-label">{`+${level} allocation`}</label>
+          {SCORE_BUCKETS.slice(0, 6).map((scoreBucket) => (
+            <div className="col-6 col-md" key={`allocation-${scoreBucket}`}>
+              <label htmlFor={`allocation-${scoreBucket}`} className="form-label">{`Score ${scoreBucket} allocation (%)`}</label>
               <input
-                id={`positive-${level}`}
+                id={`allocation-${scoreBucket}`}
                 type="number"
                 min="0"
                 max="100"
                 step="0.1"
                 className="form-control"
-                value={positiveAllocations[level]}
-                onChange={(event) => handlePositiveAllocationChange(level, event.target.value)}
+                value={allocations[scoreBucket]}
+                onChange={(event) => handleAllocationChange(scoreBucket, event.target.value)}
               />
             </div>
           ))}
         </div>
 
         <div className="row g-3">
-          {POSITIVE_LEVELS.slice(5).map((level) => (
-            <div className="col-6 col-md-3" key={`positive-${level}`}>
-              <label htmlFor={`positive-${level}`} className="form-label">{`+${level} allocation`}</label>
+          {SCORE_BUCKETS.slice(6).map((scoreBucket) => (
+            <div className="col-6 col-md" key={`allocation-${scoreBucket}`}>
+              <label htmlFor={`allocation-${scoreBucket}`} className="form-label">{`Score ${scoreBucket} allocation (%)`}</label>
               <input
-                id={`positive-${level}`}
+                id={`allocation-${scoreBucket}`}
                 type="number"
                 min="0"
                 max="100"
                 step="0.1"
                 className="form-control"
-                value={positiveAllocations[level]}
-                onChange={(event) => handlePositiveAllocationChange(level, event.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="row g-3">
-          {NEGATIVE_LEVELS.slice(0, 5).map((level) => (
-            <div className="col-6 col-md" key={`negative-${level}`}>
-              <label htmlFor={`negative-${level}`} className="form-label">{`${level} allocation`}</label>
-              <input
-                id={`negative-${level}`}
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                className="form-control"
-                value={negativeAllocations[level]}
-                onChange={(event) => handleNegativeAllocationChange(level, event.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="row g-3">
-          {NEGATIVE_LEVELS.slice(5).map((level) => (
-            <div className="col-6 col-md-3" key={`negative-${level}`}>
-              <label htmlFor={`negative-${level}`} className="form-label">{`${level} allocation`}</label>
-              <input
-                id={`negative-${level}`}
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                className="form-control"
-                value={negativeAllocations[level]}
-                onChange={(event) => handleNegativeAllocationChange(level, event.target.value)}
+                value={allocations[scoreBucket]}
+                onChange={(event) => handleAllocationChange(scoreBucket, event.target.value)}
               />
             </div>
           ))}
@@ -436,9 +353,9 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
               value={strategy}
               onChange={(event) => setStrategy(event.target.value as StrategyOption)}
             >
-              <option value="strategy1">Strategy 1</option>
-              <option value="strategy2">Strategy 2</option>
-              <option value="average">Average of Strategy 1 and 2</option>
+              <option value="strategy1">Original strategy</option>
+              <option value="strategy2">MACD 3 day strategy</option>
+              <option value="average">Average of original and MACD 3 day strategy</option>
             </select>
           </div>
 
@@ -478,7 +395,7 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
                 {result.rows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="text-center py-4 text-muted">
-                      No daily median data available for this calculator.
+                      No daily average data available for this calculator.
                     </td>
                   </tr>
                 ) : (
@@ -486,7 +403,7 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
                     <tr key={row.date}>
                       <td className="text-nowrap">{row.date}</td>
                       <td className="text-nowrap">{formatCurrency(row.price)}</td>
-                      <td className="text-nowrap">{formatNumber(row.strategyScore, 2, 2)}</td>
+                      <td className="text-nowrap">{formatNumber(row.strategyScore, 0, 2)}</td>
                       <td className="text-nowrap">{formatCurrency(row.tradeAmount)}</td>
                       <td className="text-nowrap">{formatCurrency(row.dailyProfit)}</td>
                     </tr>

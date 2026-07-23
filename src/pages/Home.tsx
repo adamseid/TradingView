@@ -23,7 +23,7 @@ function Home() {
   const [wishlist, setWishlist] = useState<TokenRow[]>([])
   const [error, setError] = useState('')
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState(REFRESH_INTERVAL_SECONDS)
-  const [selectedScore, setSelectedScore] = useState<'score1' | 'score2'>('score1')
+  const [selectedScore, setSelectedScore] = useState<'original_strategy_score' | 'macd_strategy_score'>('original_strategy_score')
   const [isRecalculating, setIsRecalculating] = useState(false)
 
   const fetchHomePageData = useCallback(async () => {
@@ -111,13 +111,13 @@ function Home() {
               className="form-select"
               value={selectedScore}
               onChange={(event) =>
-                setSelectedScore(event.target.value as 'score1' | 'score2')
+                setSelectedScore(event.target.value as 'original_strategy_score' | 'macd_strategy_score')
               }
               style={{ minWidth: '160px' }}
               disabled={isRecalculating}
             >
-              <option value="score1">Strategy One</option>
-              <option value="score2">Strategy Two</option>
+              <option value="original_strategy_score">Original Strategy Score</option>
+              <option value="macd_strategy_score">MACD Strategy Score</option>
             </select>
 
             <button
@@ -163,3 +163,5 @@ function Home() {
 }
 
 export default Home
+
+

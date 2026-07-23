@@ -18,10 +18,10 @@ export interface TokenHistoryRow {
   weekly_macd_histogram: number | null
   weekly_macd_velocity: number | null
   weekly_macd_score: number | null
-  strategy_one_score: number | null
-  strategy_two_score: number | null
-  strategy_one_direction?: number | null
-  strategy_two_direction?: number | null
+  original_strategy_score: number | null
+  macd_strategy_score: number | null
+  original_direction?: number | null
+  macd_direction?: number | null
   exchange?: string
   screener?: string
 }
@@ -43,8 +43,8 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
         <thead className="table-light sticky-top">
           <tr>
             <th scope="col" className="text-nowrap">Date</th>
-            <th scope="col" className="text-nowrap">Score 1</th>
-            <th scope="col" className="text-nowrap">Score 2</th>
+            <th scope="col" className="text-nowrap">Original Strategy Score</th>
+            <th scope="col" className="text-nowrap">MACD 3 Day Strategy Score</th>
             <th scope="col" className="text-nowrap">Price</th>
             <th scope="col" className="text-nowrap">Support/Resistance Score</th>
             <th scope="col" className="text-nowrap">MA</th>
@@ -69,8 +69,8 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
             rows.map((row) => (
               <tr key={row.id}>
                 <td className="text-nowrap">{formatDate(row.date)}</td>
-                <td className="text-nowrap fw-semibold">{formatNumber(row.strategy_one_score, 0, 3)}</td>
-                <td className="text-nowrap fw-semibold">{formatNumber(row.strategy_two_score, 0, 3)}</td>
+                <td className="text-nowrap fw-semibold">{formatNumber(row.original_strategy_score, 0, 3)}</td>
+                <td className="text-nowrap fw-semibold">{formatNumber(row.macd_strategy_score, 0, 3)}</td>
                 <td className="text-nowrap">{formatCurrency(row.current_price)}</td>
                 <td className="text-nowrap">{formatNumber(row.support_resistance_score, 0, 3)}</td>
                 <td className="text-nowrap">{formatNumber(row.sma_200, 0, 3)}</td>
