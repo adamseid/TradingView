@@ -76,6 +76,7 @@ interface TimeframeChartBundle {
   weeklyMacdSeries: ChartPoint[]
   movingAverageDatasets: ChartDataset[]
   scoreSeries: ChartPoint[]
+  threeDayStrategySeries: ChartPoint[]
 }
 
 type StrategyKey = 'original' | 'macd'
@@ -342,6 +343,34 @@ function buildSeries(points: AggregatedPoint[], selector: (point: AggregatedPoin
   })
 }
 
+function buildRollingAverageSeries(
+  points: AggregatedPoint[],
+  selector: (point: AggregatedPoint) => number | null,
+  windowSize: number,
+) {
+  const chartPoints: ChartPoint[] = []
+
+  for (let index = windowSize - 1; index < points.length; index += 1) {
+    const windowValues = points
+      .slice(index - (windowSize - 1), index + 1)
+      .map(selector)
+      .filter((value): value is number => value !== null)
+
+    const averageValue = getAverageValue(windowValues)
+
+    if (averageValue === null) {
+      continue
+    }
+
+    chartPoints.push({
+      label: points[index].label,
+      value: averageValue,
+    })
+  }
+
+  return chartPoints
+}
+
 function buildTimeframeCharts(points: AggregatedPoint[], strategy: StrategyKey): TimeframeChartBundle {
   const scoreSelector = strategy === 'original'
     ? (point: AggregatedPoint) => point.originalStrategyScore
@@ -369,6 +398,7 @@ function buildTimeframeCharts(points: AggregatedPoint[], strategy: StrategyKey):
       },
     ],
     scoreSeries: buildSeries(points, scoreSelector),
+    threeDayStrategySeries: buildRollingAverageSeries(points, scoreSelector, 3),
   }
 }
 
@@ -497,6 +527,7 @@ function StrategyTimeframeContent({
       {timeframeSections.map((section) => {
         const charts = strategy === 'original' ? section.originalCharts : section.macdCharts
         const scoreTitle = strategy === 'original' ? 'Original Strategy Score' : 'MACD 3 Day Strategy Score'
+        const rollingScoreTitle = `3 ${section.label} Average ${scoreTitle}`
 
         return (
           <Accordion.Item key={`${strategy}-${section.key}`} eventKey={`${strategy}-${section.key}`} className="shadow-sm border-0">
@@ -542,13 +573,24 @@ function StrategyTimeframeContent({
                   height={320}
                   valueFormatter={formatPriceValue}
                 />
-
+                
                 <TokenLineChart
                   data={charts.scoreSeries}
                   color={strategy === 'original' ? '#6f42c1' : '#fd7e14'}
                   emptyMessage={`No ${section.label.toLowerCase()} ${title.toLowerCase()} score data available.`}
                   title={`Average ${scoreTitle}`}
                   datasetLabel={scoreTitle}
+                  height={320}
+                  valueFormatter={formatScoreValue}
+                  showZeroLine
+                />
+
+                <TokenLineChart
+                  data={charts.threeDayStrategySeries}
+                  color={strategy === 'original' ? '#8e44ad' : '#ff922b'}
+                  emptyMessage={`Need at least 3 ${section.label.toLowerCase()} score points to chart ${rollingScoreTitle.toLowerCase()}.`}
+                  title={rollingScoreTitle}
+                  datasetLabel={rollingScoreTitle}
                   height={320}
                   valueFormatter={formatScoreValue}
                   showZeroLine
@@ -747,3 +789,8 @@ function TokenPage() {
 }
 
 export default TokenPage
+
+
+
+
+
