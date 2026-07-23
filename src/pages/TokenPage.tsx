@@ -463,7 +463,7 @@ function formatMacdValue(value: number) {
 }
 
 function formatScoreValue(value: number) {
-  return formatNumber(value, 2, 2)
+  return formatNumber(value, 0, 0)
 }
 
 function StrategyAccordionHeader({
@@ -789,6 +789,7 @@ function TokenPage() {
 }
 
 export default TokenPage
+
 
 
 

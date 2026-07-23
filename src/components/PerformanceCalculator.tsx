@@ -26,9 +26,15 @@ interface SimulationRow {
   portfolioValue: number
 }
 
+interface SimulationSummary {
+  strategyProfitPercent: number | null
+  priceIncreasePercent: number | null
+}
+
 interface SimulationResult {
   rows: SimulationRow[]
   chartData: Array<{ label: string; value: number }>
+  summary: SimulationSummary
 }
 
 const SCORE_BUCKETS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const
@@ -130,6 +136,23 @@ function buildTargetCashAllocation(scoreBucket: number, allocations: Record<numb
   return parsePercentage(allocations[scoreBucket] ?? '50')
 }
 
+function getPercentClassName(value: number | null) {
+  if (value === null || value === 0) {
+    return 'text-body'
+  }
+
+  return value > 0 ? 'text-success' : 'text-danger'
+}
+
+function formatSignedPercent(value: number | null) {
+  if (value === null) {
+    return 'N/A'
+  }
+
+  const prefix = value > 0 ? '+' : ''
+  return `${prefix}${formatNumber(value, 2, 2)}%`
+}
+
 function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
   const defaultAllocations = buildDefaultAllocationMap()
   const [initialInvestment, setInitialInvestment] = useState('1000')
@@ -161,6 +184,7 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
     let cash = startingCash
     let shares = 0
     let previousPortfolioValue = startingCash
+    let totalDeposits = 0
     let lastDepositDate = sortedDailyPoints.length > 0 ? parseDay(sortedDailyPoints[0].dayKey) : null
 
     const rows: SimulationRow[] = []
@@ -179,6 +203,7 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
         && shouldApplyRecurringDeposit(currentDate, depositFrequency, lastDepositDate)
       ) {
         depositApplied = recurringDepositAmount
+        totalDeposits += depositApplied
         cash += depositApplied
         lastDepositDate = currentDate
       }
@@ -232,12 +257,29 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
       })
     })
 
+    const firstPrice = rows[0]?.price ?? null
+    const finalPrice = rows[rows.length - 1]?.price ?? null
+    const finalPortfolioValue = rows[rows.length - 1]?.portfolioValue ?? startingCash
+    const totalContributions = startingCash + totalDeposits
+
+    const strategyProfitPercent = totalContributions > 0
+      ? ((finalPortfolioValue - totalContributions) / totalContributions) * 100
+      : null
+
+    const priceIncreasePercent = firstPrice && finalPrice
+      ? ((finalPrice - firstPrice) / firstPrice) * 100
+      : null
+
     setResult({
       rows,
       chartData: rows.map((row) => ({
         label: row.date,
         value: row.portfolioValue,
       })),
+      summary: {
+        strategyProfitPercent,
+        priceIncreasePercent,
+      },
     })
   }
 
@@ -369,6 +411,18 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
 
       {result && (
         <div className="d-flex flex-column gap-4">
+          <p className="mb-0 small text-body-secondary">
+            This strategy had{' '}
+            <span className={`fw-semibold ${getPercentClassName(result.summary.strategyProfitPercent)}`}>
+              {formatSignedPercent(result.summary.strategyProfitPercent)}
+            </span>{' '}
+            profit. The stock price increased by{' '}
+            <span className={`fw-semibold ${getPercentClassName(result.summary.priceIncreasePercent)}`}>
+              {formatSignedPercent(result.summary.priceIncreasePercent)}
+            </span>{' '}
+            from the date of tracking.
+          </p>
+
           <TokenLineChart
             data={result.chartData}
             color="#0d6efd"

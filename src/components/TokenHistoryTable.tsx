@@ -69,8 +69,8 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
             rows.map((row) => (
               <tr key={row.id}>
                 <td className="text-nowrap">{formatDate(row.date)}</td>
-                <td className="text-nowrap fw-semibold">{formatNumber(row.original_strategy_score, 0, 3)}</td>
-                <td className="text-nowrap fw-semibold">{formatNumber(row.macd_strategy_score, 0, 3)}</td>
+                <td className="text-nowrap fw-semibold">{formatNumber(row.original_strategy_score, 0, 0)}</td>
+                <td className="text-nowrap fw-semibold">{formatNumber(row.macd_strategy_score, 0, 0)}</td>
                 <td className="text-nowrap">{formatCurrency(row.current_price)}</td>
                 <td className="text-nowrap">{formatNumber(row.support_resistance_score, 0, 3)}</td>
                 <td className="text-nowrap">{formatNumber(row.sma_200, 0, 3)}</td>
@@ -91,3 +91,4 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
 }
 
 export default TokenHistoryTable
+

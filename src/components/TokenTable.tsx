@@ -229,8 +229,8 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
                       {token.ticker}
                     </Link>
                   </td>
-                  <td className="text-nowrap px-2">{formatNumber(token.original_strategy_score, 0, 3)}</td>
-                  <td className="text-nowrap px-2">{formatNumber(token.macd_strategy_score, 0, 3)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.original_strategy_score, 0, 0)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.macd_strategy_score, 0, 0)}</td>
                   <td className="text-nowrap px-2">{formatCurrency(token.current_price)}</td>
                   <td className="text-nowrap px-2">{formatCurrency(token.daily_profit)}</td>
                   <td className="text-nowrap px-2">{formatNumber(token.daily_macd_score, 0, 3)}</td>
@@ -252,3 +252,4 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
 }
 
 export default TokenTable
+
