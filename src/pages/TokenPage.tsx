@@ -789,12 +789,14 @@ function TokenPage() {
                   </Accordion.Body>
                 </Accordion.Item>
 
-                <Accordion.Item eventKey="score-validation" className="shadow-sm border-0">
-                  <Accordion.Header>Score Validation</Accordion.Header>
-                  <Accordion.Body>
-                    <ScoreValidationStudy dailyPoints={dailyAveragePoints} />
-                  </Accordion.Body>
-                </Accordion.Item>
+                <div className="d-none">
+                  <Accordion.Item eventKey="score-validation" className="shadow-sm border-0">
+                    <Accordion.Header>Score Validation</Accordion.Header>
+                    <Accordion.Body>
+                      <ScoreValidationStudy dailyPoints={dailyAveragePoints} />
+                    </Accordion.Body>
+                  </Accordion.Item>
+                </div>
 
                 <Accordion.Item eventKey="strategy-three" className="shadow-sm border-0">
                   <Accordion.Header>
