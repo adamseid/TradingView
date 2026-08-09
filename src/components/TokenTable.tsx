@@ -10,6 +10,7 @@ export interface TokenRow {
   exchange: string
   original_strategy_score: number | null
   macd_strategy_score: number | null
+  strategy_three_score: number | null
   current_price: number | null
   price_change: number | null
   support_resistance_score: number | null
@@ -35,6 +36,7 @@ type SortableColumn =
   | 'ticker'
   | 'original_strategy_score'
   | 'macd_strategy_score'
+  | 'strategy_three_score'
   | 'current_price'
   | 'daily_profit'
   | 'daily_macd_score'
@@ -55,6 +57,7 @@ const sortableColumns: Array<{ key: SortableColumn; label: string }> = [
   { key: 'ticker', label: 'Ticker' },
   { key: 'original_strategy_score', label: 'Original Strategy Score' },
   { key: 'macd_strategy_score', label: 'MACD Strategy Score' },
+  { key: 'strategy_three_score', label: 'Strategy 3 Score' },
   { key: 'current_price', label: 'Current Price' },
   { key: 'daily_profit', label: 'Daily Profit' },
   { key: 'daily_macd_score', label: 'Daily MACD Score' },
@@ -185,7 +188,7 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
           <tbody>
             {sortedTokens.length === 0 ? (
               <tr>
-                <td colSpan={15} className="text-center py-4 text-muted px-2">
+                  <td colSpan={16} className="text-center py-4 text-muted px-2">
                   No tokens available.
                 </td>
               </tr>
@@ -231,6 +234,7 @@ function TokenTable({ tokens, fetchHomePageData }: TokenTableProps) {
                   </td>
                   <td className="text-nowrap px-2">{formatNumber(token.original_strategy_score, 0, 0)}</td>
                   <td className="text-nowrap px-2">{formatNumber(token.macd_strategy_score, 0, 0)}</td>
+                  <td className="text-nowrap px-2">{formatNumber(token.strategy_three_score, 0, 0)}</td>
                   <td className="text-nowrap px-2">{formatCurrency(token.current_price)}</td>
                   <td className="text-nowrap px-2">{formatCurrency(token.daily_profit)}</td>
                   <td className="text-nowrap px-2">{formatNumber(token.daily_macd_score, 0, 3)}</td>

@@ -56,6 +56,7 @@ interface MetricBuckets {
   sma200: number[]
   originalStrategyScore: number[]
   macdStrategyScore: number[]
+  strategyThreeScore: number[]
 }
 
 interface AggregatedPoint {
@@ -69,6 +70,7 @@ interface AggregatedPoint {
   sma200: number | null
   originalStrategyScore: number | null
   macdStrategyScore: number | null
+  strategyThreeScore: number | null
 }
 
 interface TimeframeChartBundle {
@@ -80,7 +82,7 @@ interface TimeframeChartBundle {
   threeDayStrategySeries: ChartPoint[]
 }
 
-type StrategyKey = 'original' | 'macd'
+type StrategyKey = 'original' | 'macd' | 'strategy3'
 type TimeframeKey = '1h' | '4h' | '1d' | '1w' | '1m'
 
 interface TimeframeOption {
@@ -94,6 +96,7 @@ interface TimeframeSectionData {
   points: AggregatedPoint[]
   originalCharts: TimeframeChartBundle
   macdCharts: TimeframeChartBundle
+  strategyThreeCharts: TimeframeChartBundle
 }
 
 const TIMEFRAME_OPTIONS: TimeframeOption[] = [
@@ -229,6 +232,7 @@ function createMetricBuckets(): MetricBuckets {
     sma200: [],
     originalStrategyScore: [],
     macdStrategyScore: [],
+    strategyThreeScore: [],
   }
 }
 
@@ -309,6 +313,7 @@ function aggregatePoints(preparedRows: PreparedRow[], timeframe: TimeframeKey) {
     appendNumericValue(existingBucket.metrics.sma200, row.row.sma_200)
     appendNumericValue(existingBucket.metrics.originalStrategyScore, row.row.original_strategy_score)
     appendNumericValue(existingBucket.metrics.macdStrategyScore, row.row.macd_strategy_score)
+    appendNumericValue(existingBucket.metrics.strategyThreeScore, row.row.strategy_three_score)
 
     bucketMap.set(bucket.key, existingBucket)
   })
@@ -326,6 +331,7 @@ function aggregatePoints(preparedRows: PreparedRow[], timeframe: TimeframeKey) {
       sma200: getAverageValue(bucket.metrics.sma200),
       originalStrategyScore: getAverageValue(bucket.metrics.originalStrategyScore),
       macdStrategyScore: getAverageValue(bucket.metrics.macdStrategyScore),
+      strategyThreeScore: getAverageValue(bucket.metrics.strategyThreeScore),
     }))
 }
 
@@ -375,7 +381,9 @@ function buildRollingAverageSeries(
 function buildTimeframeCharts(points: AggregatedPoint[], strategy: StrategyKey): TimeframeChartBundle {
   const scoreSelector = strategy === 'original'
     ? (point: AggregatedPoint) => point.originalStrategyScore
-    : (point: AggregatedPoint) => point.macdStrategyScore
+    : strategy === 'macd'
+      ? (point: AggregatedPoint) => point.macdStrategyScore
+      : (point: AggregatedPoint) => point.strategyThreeScore
 
   return {
     priceSeries: buildSeries(points, (point) => point.price),
@@ -418,7 +426,9 @@ function buildStreakLabel(streak: number) {
 function getScoreStreak(points: AggregatedPoint[], strategy: StrategyKey) {
   const selector = strategy === 'original'
     ? (point: AggregatedPoint) => point.originalStrategyScore
-    : (point: AggregatedPoint) => point.macdStrategyScore
+    : strategy === 'macd'
+      ? (point: AggregatedPoint) => point.macdStrategyScore
+      : (point: AggregatedPoint) => point.strategyThreeScore
 
   for (let index = points.length - 1; index >= 0; index -= 1) {
     const currentValue = selector(points[index])
@@ -526,8 +536,16 @@ function StrategyTimeframeContent({
   return (
     <Accordion alwaysOpen className="d-flex flex-column gap-3">
       {timeframeSections.map((section) => {
-        const charts = strategy === 'original' ? section.originalCharts : section.macdCharts
-        const scoreTitle = strategy === 'original' ? 'Original Strategy Score' : 'MACD 3 Day Strategy Score'
+        const charts = strategy === 'original'
+          ? section.originalCharts
+          : strategy === 'macd'
+            ? section.macdCharts
+            : section.strategyThreeCharts
+        const scoreTitle = strategy === 'original'
+          ? 'Original Strategy Score'
+          : strategy === 'macd'
+            ? 'MACD 3 Day Strategy Score'
+            : 'Strategy 3 Score'
         const rollingScoreTitle = `3 ${section.label} Average ${scoreTitle}`
 
         return (
@@ -545,39 +563,43 @@ function StrategyTimeframeContent({
                   valueFormatter={formatPriceValue}
                 />
 
-                <TokenLineChart
-                  data={charts.dailyMacdSeries}
-                  color="#198754"
-                  emptyMessage={`No ${section.label.toLowerCase()} daily MACD data available.`}
-                  title="Average Daily MACD"
-                  datasetLabel="Daily MACD"
-                  height={320}
-                  valueFormatter={formatMacdValue}
-                  showZeroLine
-                />
+                {strategy !== 'strategy3' && (
+                  <>
+                    <TokenLineChart
+                      data={charts.dailyMacdSeries}
+                      color="#198754"
+                      emptyMessage={`No ${section.label.toLowerCase()} daily MACD data available.`}
+                      title="Average Daily MACD"
+                      datasetLabel="Daily MACD"
+                      height={320}
+                      valueFormatter={formatMacdValue}
+                      showZeroLine
+                    />
 
-                <TokenLineChart
-                  data={charts.weeklyMacdSeries}
-                  color="#dc3545"
-                  emptyMessage={`No ${section.label.toLowerCase()} weekly MACD data available.`}
-                  title="Average Weekly MACD"
-                  datasetLabel="Weekly MACD"
-                  height={320}
-                  valueFormatter={formatMacdValue}
-                  showZeroLine
-                />
+                    <TokenLineChart
+                      data={charts.weeklyMacdSeries}
+                      color="#dc3545"
+                      emptyMessage={`No ${section.label.toLowerCase()} weekly MACD data available.`}
+                      title="Average Weekly MACD"
+                      datasetLabel="Weekly MACD"
+                      height={320}
+                      valueFormatter={formatMacdValue}
+                      showZeroLine
+                    />
 
-                <TokenMultiLineChart
-                  datasets={charts.movingAverageDatasets}
-                  emptyMessage={`No ${section.label.toLowerCase()} moving average data available.`}
-                  title="Average Moving Averages"
-                  height={320}
-                  valueFormatter={formatPriceValue}
-                />
+                    <TokenMultiLineChart
+                      datasets={charts.movingAverageDatasets}
+                      emptyMessage={`No ${section.label.toLowerCase()} moving average data available.`}
+                      title="Average Moving Averages"
+                      height={320}
+                      valueFormatter={formatPriceValue}
+                    />
+                  </>
+                )}
                 
                 <TokenLineChart
                   data={charts.scoreSeries}
-                  color={strategy === 'original' ? '#6f42c1' : '#fd7e14'}
+                  color={strategy === 'original' ? '#6f42c1' : strategy === 'macd' ? '#fd7e14' : '#0f766e'}
                   emptyMessage={`No ${section.label.toLowerCase()} ${title.toLowerCase()} score data available.`}
                   title={`Average ${scoreTitle}`}
                   datasetLabel={scoreTitle}
@@ -588,7 +610,7 @@ function StrategyTimeframeContent({
 
                 <TokenLineChart
                   data={charts.threeDayStrategySeries}
-                  color={strategy === 'original' ? '#8e44ad' : '#ff922b'}
+                  color={strategy === 'original' ? '#8e44ad' : strategy === 'macd' ? '#ff922b' : '#14b8a6'}
                   emptyMessage={`Need at least 3 ${section.label.toLowerCase()} score points to chart ${rollingScoreTitle.toLowerCase()}.`}
                   title={rollingScoreTitle}
                   datasetLabel={rollingScoreTitle}
@@ -651,6 +673,7 @@ function TokenPage() {
         points,
         originalCharts: buildTimeframeCharts(points, 'original'),
         macdCharts: buildTimeframeCharts(points, 'macd'),
+        strategyThreeCharts: buildTimeframeCharts(points, 'strategy3'),
       }
     })
   }, [preparedRows])
@@ -663,13 +686,16 @@ function TokenPage() {
         price: point.price,
         originalStrategyScore: point.originalStrategyScore,
         macdStrategyScore: point.macdStrategyScore,
+        strategyThreeScore: point.strategyThreeScore,
       }))
     : []
 
   const originalPreviewData = dailyTimeframeSection?.originalCharts.scoreSeries ?? []
   const macdPreviewData = dailyTimeframeSection?.macdCharts.scoreSeries ?? []
+  const strategyThreePreviewData = dailyTimeframeSection?.strategyThreeCharts.scoreSeries ?? []
   const originalStreak = dailyTimeframeSection ? getScoreStreak(dailyTimeframeSection.points, 'original') : 0
   const macdStreak = dailyTimeframeSection ? getScoreStreak(dailyTimeframeSection.points, 'macd') : 0
+  const strategyThreeStreak = dailyTimeframeSection ? getScoreStreak(dailyTimeframeSection.points, 'strategy3') : 0
 
   return (
     <>
@@ -767,6 +793,25 @@ function TokenPage() {
                   <Accordion.Header>Score Validation</Accordion.Header>
                   <Accordion.Body>
                     <ScoreValidationStudy dailyPoints={dailyAveragePoints} />
+                  </Accordion.Body>
+                </Accordion.Item>
+
+                <Accordion.Item eventKey="strategy-three" className="shadow-sm border-0">
+                  <Accordion.Header>
+                    <StrategyAccordionHeader
+                      title="Strategy 3"
+                      streak={strategyThreeStreak}
+                      previewData={strategyThreePreviewData}
+                      color="#0f766e"
+                      datasetLabel="Strategy 3 Score"
+                    />
+                  </Accordion.Header>
+                  <Accordion.Body>
+                    <StrategyTimeframeContent
+                      title="Strategy 3"
+                      timeframeSections={timeframeSections}
+                      strategy="strategy3"
+                    />
                   </Accordion.Body>
                 </Accordion.Item>
 

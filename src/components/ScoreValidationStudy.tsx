@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { formatNumber } from '../utils/formatters'
 import type { PerformanceCalculatorDayPoint } from './PerformanceCalculator'
 
-type StrategyKey = 'original' | 'macd'
+type StrategyKey = 'original' | 'macd' | 'strategy3'
 
 type HorizonKey = 1 | 3 | 5 | 10
 
@@ -100,7 +100,9 @@ function buildBucketMetrics(
   sortedPoints.forEach((point, index) => {
     const score = strategy === 'original'
       ? point.originalStrategyScore
-      : point.macdStrategyScore
+      : strategy === 'macd'
+        ? point.macdStrategyScore
+        : point.strategyThreeScore
 
     if (score === null) {
       return
@@ -153,7 +155,11 @@ function ScoreValidationStudy({ dailyPoints }: ScoreValidationStudyProps) {
     [dailyPoints, strategy],
   )
 
-  const strategyTitle = strategy === 'original' ? 'Original strategy' : 'MACD 3 day strategy'
+  const strategyTitle = strategy === 'original'
+    ? 'Original strategy'
+    : strategy === 'macd'
+      ? 'MACD 3 day strategy'
+      : 'Strategy 3'
 
   return (
     <div className="d-flex flex-column gap-3">
@@ -179,6 +185,13 @@ function ScoreValidationStudy({ dailyPoints }: ScoreValidationStudyProps) {
             onClick={() => setStrategy('macd')}
           >
             MACD 3 day strategy
+          </button>
+          <button
+            type="button"
+            className={`btn ${strategy === 'strategy3' ? 'btn-primary' : 'btn-outline-primary'}`}
+            onClick={() => setStrategy('strategy3')}
+          >
+            Strategy 3
           </button>
         </div>
       </div>

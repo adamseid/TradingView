@@ -23,7 +23,9 @@ function Home() {
   const [wishlist, setWishlist] = useState<TokenRow[]>([])
   const [error, setError] = useState('')
   const [secondsUntilRefresh, setSecondsUntilRefresh] = useState(REFRESH_INTERVAL_SECONDS)
-  const [selectedScore, setSelectedScore] = useState<'original_strategy_score' | 'macd_strategy_score'>('original_strategy_score')
+  const [selectedScore, setSelectedScore] = useState<
+    'original_strategy_score' | 'macd_strategy_score' | 'strategy_three_score'
+  >('original_strategy_score')
   const [isRecalculating, setIsRecalculating] = useState(false)
 
   const fetchHomePageData = useCallback(async () => {
@@ -108,17 +110,20 @@ function Home() {
 
           <div className="d-flex align-items-center gap-2 mt-3 mt-md-0">
             <select
-              className="form-select"
-              value={selectedScore}
-              onChange={(event) =>
-                setSelectedScore(event.target.value as 'original_strategy_score' | 'macd_strategy_score')
-              }
-              style={{ minWidth: '160px' }}
-              disabled={isRecalculating}
-            >
-              <option value="original_strategy_score">Original Strategy Score</option>
-              <option value="macd_strategy_score">MACD Strategy Score</option>
-            </select>
+                className="form-select"
+                value={selectedScore}
+                onChange={(event) =>
+                  setSelectedScore(
+                    event.target.value as 'original_strategy_score' | 'macd_strategy_score' | 'strategy_three_score',
+                  )
+                }
+                style={{ minWidth: '160px' }}
+                disabled={isRecalculating}
+              >
+                <option value="original_strategy_score">Original Strategy Score</option>
+                <option value="macd_strategy_score">MACD Strategy Score</option>
+                <option value="strategy_three_score">Strategy 3 Score</option>
+              </select>
 
             <button
               type="button"

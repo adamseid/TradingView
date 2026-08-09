@@ -8,10 +8,11 @@ export interface PerformanceCalculatorDayPoint {
   price: number | null
   originalStrategyScore: number | null
   macdStrategyScore: number | null
+  strategyThreeScore: number | null
 }
 
 type DepositFrequency = 'daily' | 'weekly' | 'monthly'
-type StrategyOption = 'strategy1' | 'strategy2' | 'average'
+type StrategyOption = 'strategy1' | 'strategy2' | 'strategy3' | 'average'
 
 interface PerformanceCalculatorProps {
   dailyPoints: PerformanceCalculatorDayPoint[]
@@ -79,6 +80,7 @@ function resolveStrategyScore(
 ) {
   const originalScore = dayPoint.originalStrategyScore
   const macdScore = dayPoint.macdStrategyScore
+  const strategyThreeScore = dayPoint.strategyThreeScore
 
   if (strategy === 'strategy1') {
     return originalScore ?? 50
@@ -88,11 +90,15 @@ function resolveStrategyScore(
     return macdScore ?? 50
   }
 
+  if (strategy === 'strategy3') {
+    return strategyThreeScore ?? 50
+  }
+
   if (originalScore !== null && macdScore !== null) {
     return (originalScore + macdScore) / 2
   }
 
-  return originalScore ?? macdScore ?? 50
+  return originalScore ?? macdScore ?? strategyThreeScore ?? 50
 }
 
 function clampScoreToBucket(score: number) {
@@ -397,6 +403,7 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
             >
               <option value="strategy1">Original strategy</option>
               <option value="strategy2">MACD 3 day strategy</option>
+              <option value="strategy3">Strategy 3</option>
               <option value="average">Average of original and MACD 3 day strategy</option>
             </select>
           </div>
