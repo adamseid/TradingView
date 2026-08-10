@@ -7,11 +7,28 @@ export interface TokenHistoryRow {
   current_price: number | null
   resistance: number | null
   support: number | null
+  pivot_classic_middle: number | null
+  pivot_classic_s2: number | null
+  pivot_classic_s3: number | null
+  pivot_classic_r2: number | null
+  pivot_classic_r3: number | null
   support_resistance_score: number | null
   sma_50: number | null
   sma_100: number | null
   sma_200: number | null
+  ema_20: number | null
+  ema_50: number | null
+  ema_100: number | null
+  ema_200: number | null
   ma_score: number | null
+  rsi: number | null
+  yesterday_rsi: number | null
+  stoch_rsi_k: number | null
+  adx: number | null
+  adx_di_positive: number | null
+  adx_di_negative: number | null
+  bollinger_bands_lower: number | null
+  bollinger_bands_upper: number | null
   daily_macd_histogram: number | null
   daily_macd_velocity: number | null
   daily_macd_score: number | null
@@ -21,6 +38,7 @@ export interface TokenHistoryRow {
   original_strategy_score: number | null
   macd_strategy_score: number | null
   strategy_three_score: number | null
+  market_regime: string | null
   original_direction?: number | null
   macd_direction?: number | null
   exchange?: string
@@ -47,6 +65,7 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
             <th scope="col" className="text-nowrap">Original Strategy Score</th>
             <th scope="col" className="text-nowrap">MACD 3 Day Strategy Score</th>
             <th scope="col" className="text-nowrap">Strategy 3 Score</th>
+            <th scope="col" className="text-nowrap">Market Regime</th>
             <th scope="col" className="text-nowrap">Price</th>
             <th scope="col" className="text-nowrap">Support/Resistance Score</th>
             <th scope="col" className="text-nowrap">MA</th>
@@ -63,7 +82,7 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
         <tbody>
           {rows.length === 0 ? (
             <tr>
-                <td colSpan={14} className="text-center py-4 text-muted">
+                <td colSpan={15} className="text-center py-4 text-muted">
                 No stock history found.
               </td>
             </tr>
@@ -74,6 +93,7 @@ function TokenHistoryTable({ rows }: TokenHistoryTableProps) {
                 <td className="text-nowrap fw-semibold">{formatNumber(row.original_strategy_score, 0, 0)}</td>
                 <td className="text-nowrap fw-semibold">{formatNumber(row.macd_strategy_score, 0, 0)}</td>
                 <td className="text-nowrap fw-semibold">{formatNumber(row.strategy_three_score, 0, 0)}</td>
+                <td className="text-nowrap text-capitalize">{row.market_regime ?? 'N/A'}</td>
                 <td className="text-nowrap">{formatCurrency(row.current_price)}</td>
                 <td className="text-nowrap">{formatNumber(row.support_resistance_score, 0, 3)}</td>
                 <td className="text-nowrap">{formatNumber(row.sma_200, 0, 3)}</td>
