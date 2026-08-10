@@ -9,6 +9,7 @@ export interface PerformanceCalculatorDayPoint {
   originalStrategyScore: number | null
   macdStrategyScore: number | null
   strategyThreeScore: number | null
+  marketRegime: string | null
 }
 
 type DepositFrequency = 'daily' | 'weekly' | 'monthly'
@@ -34,6 +35,17 @@ interface SimulationSummary {
 
 interface SimulationResult {
   rows: SimulationRow[]
+  chartData: Array<{ label: string; value: number }>
+  summary: SimulationSummary
+}
+
+interface MarketRegimeSimulationRow extends SimulationRow {
+  marketRegime: string
+  action: 'buy' | 'sell' | 'hold'
+}
+
+interface MarketRegimeSimulationResult {
+  rows: MarketRegimeSimulationRow[]
   chartData: Array<{ label: string; value: number }>
   summary: SimulationSummary
 }
@@ -157,6 +169,17 @@ function formatSignedPercent(value: number | null) {
 
   const prefix = value > 0 ? '+' : ''
   return `${prefix}${formatNumber(value, 2, 2)}%`
+}
+
+function formatMarketRegimeLabel(value: string | null) {
+  if (!value) {
+    return 'N/A'
+  }
+
+  return value
+    .split('_')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ')
 }
 
 function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
@@ -479,4 +502,352 @@ function PerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
   )
 }
 
+function MarketRegimePerformanceCalculator({ dailyPoints }: PerformanceCalculatorProps) {
+  const [initialInvestment, setInitialInvestment] = useState('1000')
+  const [recurringDeposit, setRecurringDeposit] = useState('0')
+  const [depositFrequency, setDepositFrequency] = useState<DepositFrequency>('weekly')
+  const [dcaPercent, setDcaPercent] = useState('10')
+  const [cashAllocation, setCashAllocation] = useState('25')
+  const [boundaryScore, setBoundaryScore] = useState('70')
+  const [strategy, setStrategy] = useState<StrategyOption>('strategy3')
+  const [result, setResult] = useState<MarketRegimeSimulationResult | null>(null)
+
+  const sortedDailyPoints = [...dailyPoints]
+    .filter((point): point is PerformanceCalculatorDayPoint & { price: number } => point.price !== null)
+    .sort((left, right) => left.dayKey.localeCompare(right.dayKey))
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    const startingCash = parseAmount(initialInvestment)
+    const recurringDepositAmount = parseAmount(recurringDeposit)
+    const maxDailyTradePercent = parsePercentage(dcaPercent)
+    const targetCashAllocation = parsePercentage(cashAllocation)
+    const boundaryScoreValue = parsePercentage(boundaryScore)
+
+    let cash = startingCash
+    let shares = 0
+    let previousPortfolioValue = startingCash
+    let totalDeposits = 0
+    let lastDepositDate = sortedDailyPoints.length > 0 ? parseDay(sortedDailyPoints[0].dayKey) : null
+
+    const rows: MarketRegimeSimulationRow[] = []
+
+    sortedDailyPoints.forEach((dayPoint) => {
+      const currentDate = parseDay(dayPoint.dayKey)
+
+      if (!currentDate) {
+        return
+      }
+
+      let depositApplied = 0
+
+      if (
+        recurringDepositAmount > 0
+        && shouldApplyRecurringDeposit(currentDate, depositFrequency, lastDepositDate)
+      ) {
+        depositApplied = recurringDepositAmount
+        totalDeposits += depositApplied
+        cash += depositApplied
+        lastDepositDate = currentDate
+      }
+
+      const strategyScore = resolveStrategyScore(dayPoint, strategy)
+      const marketRegime = dayPoint.marketRegime ?? 'unknown'
+      const portfolioValueBeforeTrade = cash + (shares * dayPoint.price)
+      const tradeLimit = portfolioValueBeforeTrade * (maxDailyTradePercent / 100)
+      const targetCashValue = portfolioValueBeforeTrade * (targetCashAllocation / 100)
+
+      let tradeAmount = 0
+      let action: MarketRegimeSimulationRow['action'] = 'hold'
+
+      if (tradeLimit > 0) {
+        if (marketRegime === 'bull_quiet') {
+          const buyAmount = Math.min(
+            Math.max(0, cash - targetCashValue),
+            tradeLimit,
+            cash,
+          )
+
+          if (buyAmount > 0) {
+            shares += buyAmount / dayPoint.price
+            cash -= buyAmount
+            tradeAmount = -buyAmount
+            action = 'buy'
+          }
+        } else if (marketRegime === 'bear_quiet') {
+          const sellAmount = Math.min(tradeLimit, shares * dayPoint.price)
+
+          if (sellAmount > 0) {
+            shares -= sellAmount / dayPoint.price
+            cash += sellAmount
+            tradeAmount = sellAmount
+            action = 'sell'
+          }
+        } else if (
+          marketRegime === 'bull_volatile'
+          || marketRegime === 'bear_volatile'
+        ) {
+          if (strategyScore > boundaryScoreValue) {
+            const buyAmount = Math.min(
+              Math.max(0, cash - targetCashValue),
+              tradeLimit,
+              cash,
+            )
+
+            if (buyAmount > 0) {
+              shares += buyAmount / dayPoint.price
+              cash -= buyAmount
+              tradeAmount = -buyAmount
+              action = 'buy'
+            }
+          } else if (strategyScore < boundaryScoreValue) {
+            const sellAmount = Math.min(
+              Math.max(0, targetCashValue - cash),
+              tradeLimit,
+              shares * dayPoint.price,
+            )
+
+            if (sellAmount > 0) {
+              shares -= sellAmount / dayPoint.price
+              cash += sellAmount
+              tradeAmount = sellAmount
+              action = 'sell'
+            }
+          }
+        }
+      }
+
+      const portfolioValue = cash + (shares * dayPoint.price)
+      const dailyProfit = rows.length === 0
+        ? portfolioValue - startingCash - depositApplied
+        : portfolioValue - previousPortfolioValue - depositApplied
+
+      previousPortfolioValue = portfolioValue
+
+      rows.push({
+        date: dayPoint.dayLabel,
+        price: dayPoint.price,
+        strategyScore,
+        tradeAmount,
+        dailyProfit,
+        portfolioValue,
+        marketRegime,
+        action,
+      })
+    })
+
+    const firstPrice = rows[0]?.price ?? null
+    const finalPrice = rows[rows.length - 1]?.price ?? null
+    const finalPortfolioValue = rows[rows.length - 1]?.portfolioValue ?? startingCash
+    const totalContributions = startingCash + totalDeposits
+
+    const strategyProfitPercent = totalContributions > 0
+      ? ((finalPortfolioValue - totalContributions) / totalContributions) * 100
+      : null
+
+    const priceIncreasePercent = firstPrice && finalPrice
+      ? ((finalPrice - firstPrice) / firstPrice) * 100
+      : null
+
+    setResult({
+      rows,
+      chartData: rows.map((row) => ({
+        label: row.date,
+        value: row.portfolioValue,
+      })),
+      summary: {
+        strategyProfitPercent,
+        priceIncreasePercent,
+      },
+    })
+  }
+
+  return (
+    <div className="d-flex flex-column gap-4">
+      <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+        <div className="row g-3">
+          <div className="col-12 col-md-4">
+            <label htmlFor="market-regime-initial-investment" className="form-label">Initial investment</label>
+            <input
+              id="market-regime-initial-investment"
+              type="number"
+              min="0"
+              step="0.01"
+              className="form-control"
+              value={initialInvestment}
+              onChange={(event) => setInitialInvestment(event.target.value)}
+            />
+          </div>
+
+          <div className="col-12 col-md-4">
+            <label htmlFor="market-regime-recurring-deposit" className="form-label">Recurring deposits</label>
+            <input
+              id="market-regime-recurring-deposit"
+              type="number"
+              min="0"
+              step="0.01"
+              className="form-control"
+              value={recurringDeposit}
+              onChange={(event) => setRecurringDeposit(event.target.value)}
+            />
+          </div>
+
+          <div className="col-12 col-md-4">
+            <label htmlFor="market-regime-deposit-frequency" className="form-label">Deposit frequency</label>
+            <select
+              id="market-regime-deposit-frequency"
+              className="form-select"
+              value={depositFrequency}
+              onChange={(event) => setDepositFrequency(event.target.value as DepositFrequency)}
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="row g-3">
+          <div className="col-12 col-md-4">
+            <label htmlFor="market-regime-dca-percent" className="form-label">DCA (%)</label>
+            <input
+              id="market-regime-dca-percent"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              className="form-control"
+              value={dcaPercent}
+              onChange={(event) => setDcaPercent(event.target.value)}
+            />
+          </div>
+
+          <div className="col-12 col-md-4">
+            <label htmlFor="market-regime-cash-allocation" className="form-label">Cash allocation (%)</label>
+            <input
+              id="market-regime-cash-allocation"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              className="form-control"
+              value={cashAllocation}
+              onChange={(event) => setCashAllocation(event.target.value)}
+            />
+          </div>
+
+          <div className="col-12 col-md-4">
+            <label htmlFor="market-regime-boundary-score" className="form-label">Boundary score</label>
+            <input
+              id="market-regime-boundary-score"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              className="form-control"
+              value={boundaryScore}
+              onChange={(event) => setBoundaryScore(event.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="row g-3 align-items-end">
+          <div className="col-12 col-md-8">
+            <label htmlFor="market-regime-strategy-select" className="form-label">Strategy</label>
+            <select
+              id="market-regime-strategy-select"
+              className="form-select"
+              value={strategy}
+              onChange={(event) => setStrategy(event.target.value as StrategyOption)}
+            >
+              <option value="strategy1">Original strategy</option>
+              <option value="strategy2">MACD 3 day strategy</option>
+              <option value="strategy3">Strategy 3</option>
+              <option value="average">Average of original and MACD 3 day strategy</option>
+            </select>
+          </div>
+
+          <div className="col-12 col-md-4">
+            <button type="submit" className="btn btn-primary w-100">
+              Calculate regime performance
+            </button>
+          </div>
+        </div>
+
+        <div className="small text-muted border rounded bg-body-tertiary px-3 py-2">
+          DCA is applied as a percentage of total net worth for that day: cash plus current stock value.
+          `bull_quiet` buys toward the cash allocation target, `bear_quiet` sells toward full cash,
+          sideways regimes hold, and volatile bull/bear regimes buy above the boundary score and sell below it.
+        </div>
+      </form>
+
+      {result && (
+        <div className="d-flex flex-column gap-4">
+          <p className="mb-0 small text-body-secondary">
+            This market-regime strategy had{' '}
+            <span className={`fw-semibold ${getPercentClassName(result.summary.strategyProfitPercent)}`}>
+              {formatSignedPercent(result.summary.strategyProfitPercent)}
+            </span>{' '}
+            profit. The stock price increased by{' '}
+            <span className={`fw-semibold ${getPercentClassName(result.summary.priceIncreasePercent)}`}>
+              {formatSignedPercent(result.summary.priceIncreasePercent)}
+            </span>{' '}
+            from the date of tracking.
+          </p>
+
+          <TokenLineChart
+            data={result.chartData}
+            color="#0f766e"
+            emptyMessage="No portfolio data available."
+            title="Market Regime Portfolio Value"
+            datasetLabel="Portfolio"
+            height={320}
+            valueFormatter={(value) => formatCurrency(value)}
+          />
+
+          <div className="table-responsive" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+            <table className="table table-hover table-bordered align-middle w-100 mb-0">
+              <thead className="table-light sticky-top">
+                <tr>
+                  <th scope="col" className="text-nowrap">Date</th>
+                  <th scope="col" className="text-nowrap">Price</th>
+                  <th scope="col" className="text-nowrap">Market regime</th>
+                  <th scope="col" className="text-nowrap">Strategy score</th>
+                  <th scope="col" className="text-nowrap">Action</th>
+                  <th scope="col" className="text-nowrap">Invested / sold</th>
+                  <th scope="col" className="text-nowrap">Daily profit</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {result.rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4 text-muted">
+                      No daily average data available for this calculator.
+                    </td>
+                  </tr>
+                ) : (
+                  result.rows.map((row) => (
+                    <tr key={row.date}>
+                      <td className="text-nowrap">{row.date}</td>
+                      <td className="text-nowrap">{formatCurrency(row.price)}</td>
+                      <td className="text-nowrap">{formatMarketRegimeLabel(row.marketRegime)}</td>
+                      <td className="text-nowrap">{formatNumber(row.strategyScore, 0, 2)}</td>
+                      <td className="text-nowrap text-capitalize">{row.action}</td>
+                      <td className="text-nowrap">{formatCurrency(row.tradeAmount)}</td>
+                      <td className="text-nowrap">{formatCurrency(row.dailyProfit)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default PerformanceCalculator
+export { MarketRegimePerformanceCalculator }

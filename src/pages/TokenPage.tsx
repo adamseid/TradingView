@@ -5,6 +5,7 @@ import api, { getApiErrorMessage } from '../api/client'
 
 import AppNavbar from '../components/AppNavbar'
 import PerformanceCalculator, {
+  MarketRegimePerformanceCalculator,
   type PerformanceCalculatorDayPoint,
 } from '../components/PerformanceCalculator'
 import ScoreValidationStudy from '../components/ScoreValidationStudy'
@@ -1150,6 +1151,7 @@ function TokenPage() {
         originalStrategyScore: point.originalStrategyScore,
         macdStrategyScore: point.macdStrategyScore,
         strategyThreeScore: point.strategyThreeScore,
+        marketRegime: point.marketRegime,
       }))
     : []
 
@@ -1211,6 +1213,13 @@ function TokenPage() {
                   <Accordion.Header>Performance calculator</Accordion.Header>
                   <Accordion.Body>
                     <PerformanceCalculator dailyPoints={dailyAveragePoints} />
+                  </Accordion.Body>
+                </Accordion.Item>
+
+                <Accordion.Item eventKey="market-regime-performance" className="shadow-sm border-0">
+                  <Accordion.Header>Market Regime Performance Calculator</Accordion.Header>
+                  <Accordion.Body>
+                    <MarketRegimePerformanceCalculator dailyPoints={dailyAveragePoints} />
                   </Accordion.Body>
                 </Accordion.Item>
 
